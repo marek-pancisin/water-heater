@@ -99,7 +99,7 @@ void setup() {
   lcd.begin(16, 2);
   pinMode(RELAY_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(RELAY_PIN, LOW);
+  digitalWrite(RELAY_PIN, HIGH);
   digitalWrite(LED_PIN, LOW);
   
   // Inicializácia DHT senzora
@@ -270,7 +270,7 @@ void controlRelay() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     relayState = !relayState;
-    digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
+    digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
     digitalWrite(LED_PIN, relayState ? HIGH : LOW);
   }
 }
