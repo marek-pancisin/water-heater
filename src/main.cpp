@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 #include <EEPROM.h>
+#include <DHT.h>
 
 // Konfigurácia LCD (štandardné piny pre LCD Keypad Shield)
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
@@ -9,6 +10,11 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 const int RELAY_PIN = 3;   // Pin pre relé
 const int LED_PIN = 13;    // LED indikácia
 const int BUTTON_PIN = A0; // Analógový vstup pre tlačidlá
+const int DHT_PIN = 2;     // Pin pre DHT11 senzor
+
+// DHT11 senzor konfigurácia
+#define DHTTYPE DHT11
+DHT dht(DHT_PIN, DHTTYPE);
 
 // EEPROM adresy pre ukladanie nastavení
 const int EEPROM_ADDR_OFF = 0;    // Adresa pre OFF interval (2 bajty)
@@ -24,6 +30,12 @@ unsigned long onIntervalSeconds = 1;    // Default: 1 sekunda zapnuté
 bool relayState = false;
 unsigned long previousMillis = 0;
 unsigned long startTime = 0;
+
+// DHT senzor premenné
+float temperature = 0.0;
+float humidity = 0.0;
+unsigned long lastDHTRead = 0;
+const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 
 // Menu premenné
 enum MenuState { NORMAL, MENU_OFF, MENU_ON }; 
@@ -42,15 +54,12 @@ void saveToEEPROM() {
   EEPROM.write(EEPROM_ADDR_ON, onIntervalSeconds & 0xFF);
   EEPROM.write(EEPROM_ADDR_ON + 1, (onIntervalSeconds >> 8) & 0xFF);
   EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC);
-  
-  Serial.println("Nastavenia uložené do EEPROM");
 }
 
 void loadFromEEPROM() {
   byte magic = EEPROM.read(EEPROM_ADDR_MAGIC);
   
   if (magic != EEPROM_MAGIC) {
-    Serial.println("Prvé spustenie - používam defaultné hodnoty");
     saveToEEPROM();
     return;
   }
@@ -65,8 +74,6 @@ void loadFromEEPROM() {
   
   if (offIntervalSeconds < 1 || offIntervalSeconds > 999) offIntervalSeconds = 5;
   if (onIntervalSeconds < 1 || onIntervalSeconds > 999) onIntervalSeconds = 1;
-  
-  Serial.println("Nastavenia načítané z EEPROM");
 }
 
 Button readButton() {
@@ -95,6 +102,9 @@ void setup() {
   digitalWrite(RELAY_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
   
+  // Inicializácia DHT senzora
+  dht.begin();
+  
   lcd.clear();
   lcd.print("Water Heater");
   lcd.setCursor(0, 1);
@@ -117,10 +127,25 @@ void setup() {
 }
 
 void displayNormalMode() {
-  lcd.clear();
-  lcd.setCursor(13, 0);
-  lcd.print(relayState ? "ZAP" : "VYP");
+  lcd.clear();  
+  // // Prvý riadok: Teplota a vlhkosť
+  // lcd.setCursor(0, 0);
+  // lcd.print("T:");
+  // if (temperature >= -9.9 && temperature <= 99.9) {
+  //   lcd.print(temperature, 1);
+  //   lcd.print("C");
+  // } else {
+  //   lcd.print("--.-C");
+  // }
+  // lcd.print(" H:");
+  // if (humidity >= 0 && humidity <= 100) {
+  //   lcd.print(humidity, 0);
+  //   lcd.print("%");
+  // } else {
+  //   lcd.print("--%");
+  // }
   
+  // Druhý riadok: Zostávajúci čas a status
   unsigned long currentMillis = millis();
   unsigned long elapsed = currentMillis - previousMillis;
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
@@ -130,12 +155,32 @@ void displayNormalMode() {
   lcd.print(remaining);
   lcd.print("s  ");
   
+  lcd.setCursor(7, 0);
+  if (temperature >= -9.9 && temperature <= 99.9) {
+    lcd.print(temperature, 1);
+    lcd.print("C");
+  } else {
+    lcd.print("--.-C");
+  }
+
+  lcd.setCursor(13, 0);
+  if (humidity >= 0 && humidity <= 99) {
+    lcd.print(humidity, 0);
+    lcd.print("%");
+  } else {
+    lcd.print("--%");
+  }
+
   lcd.setCursor(0, 1);
-  lcd.print("ON:");
+  lcd.print("SCH:");
   lcd.print(onIntervalSeconds);
-  lcd.print("s OFF:");
+  lcd.print("/");
   lcd.print(offIntervalSeconds);
   lcd.print("s");
+
+  lcd.setCursor(11, 1);
+  lcd.print("C:");
+  lcd.print(relayState ? "ZAP" : "VYP");
 }
 
 void displayMenuOff() {
@@ -230,7 +275,25 @@ void controlRelay() {
   }
 }
 
+void readDHTSensor() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastDHTRead >= DHT_READ_INTERVAL) {
+    lastDHTRead = currentMillis;
+    
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+    
+    // Kontrola, či sa podarilo prečítať údaje a či sú v platnom rozsahu
+    // DHT11 rozsah: 0-50°C, 20-80% vlhkosť
+    if (!isnan(h) && !isnan(t) && t >= 0 && t <= 50 && h >= 20 && h <= 80) {
+      humidity = h;
+      temperature = t;
+    }
+  }
+}
+
 void loop() {
+  readDHTSensor();
   handleButtons();
   controlRelay();
   
