@@ -5,7 +5,7 @@
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 // Konfigurácia pinov
-const int RELAY_PIN = 2;   // Pin pre relé
+const int RELAY_PIN = 3;   // Pin pre relé
 const int LED_PIN = 13;    // LED indikácia
 const int BUTTON_PIN = A0; // Analógový vstup pre tlačidlá
 
