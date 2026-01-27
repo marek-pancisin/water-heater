@@ -54,15 +54,12 @@ void saveToEEPROM() {
   EEPROM.write(EEPROM_ADDR_ON, onIntervalSeconds & 0xFF);
   EEPROM.write(EEPROM_ADDR_ON + 1, (onIntervalSeconds >> 8) & 0xFF);
   EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC);
-  
-  Serial.println("Nastavenia uložené do EEPROM");
 }
 
 void loadFromEEPROM() {
   byte magic = EEPROM.read(EEPROM_ADDR_MAGIC);
   
   if (magic != EEPROM_MAGIC) {
-    Serial.println("Prvé spustenie - používam defaultné hodnoty");
     saveToEEPROM();
     return;
   }
@@ -77,8 +74,6 @@ void loadFromEEPROM() {
   
   if (offIntervalSeconds < 1 || offIntervalSeconds > 999) offIntervalSeconds = 5;
   if (onIntervalSeconds < 1 || onIntervalSeconds > 999) onIntervalSeconds = 1;
-  
-  Serial.println("Nastavenia načítané z EEPROM");
 }
 
 Button readButton() {
@@ -132,24 +127,23 @@ void setup() {
 }
 
 void displayNormalMode() {
-  lcd.clear();
-  
-  // Prvý riadok: Teplota a vlhkosť
-  lcd.setCursor(0, 0);
-  lcd.print("T:");
-  if (temperature >= -9.9 && temperature <= 99.9) {
-    lcd.print(temperature, 1);
-    lcd.print("C");
-  } else {
-    lcd.print("--.-C");
-  }
-  lcd.print(" H:");
-  if (humidity >= 0 && humidity <= 100) {
-    lcd.print(humidity, 0);
-    lcd.print("%");
-  } else {
-    lcd.print("--%");
-  }
+  lcd.clear();  
+  // // Prvý riadok: Teplota a vlhkosť
+  // lcd.setCursor(0, 0);
+  // lcd.print("T:");
+  // if (temperature >= -9.9 && temperature <= 99.9) {
+  //   lcd.print(temperature, 1);
+  //   lcd.print("C");
+  // } else {
+  //   lcd.print("--.-C");
+  // }
+  // lcd.print(" H:");
+  // if (humidity >= 0 && humidity <= 100) {
+  //   lcd.print(humidity, 0);
+  //   lcd.print("%");
+  // } else {
+  //   lcd.print("--%");
+  // }
   
   // Druhý riadok: Zostávajúci čas a status
   unsigned long currentMillis = millis();
@@ -157,14 +151,36 @@ void displayNormalMode() {
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
   unsigned long remaining = (interval - elapsed) / 1000;
   
-  lcd.setCursor(0, 1);
-  if (relayState) {
-    lcd.print("ZAP:");
-  } else {
-    lcd.print("VYP:");
-  }
+  lcd.setCursor(0, 0);
   lcd.print(remaining);
+  lcd.print("s  ");
+  
+  lcd.setCursor(7, 0);
+  if (temperature >= -9.9 && temperature <= 99.9) {
+    lcd.print(temperature, 1);
+    lcd.print("C");
+  } else {
+    lcd.print("--.-C");
+  }
+
+  lcd.setCursor(13, 0);
+  if (humidity >= 0 && humidity <= 99) {
+    lcd.print(humidity, 0);
+    lcd.print("%");
+  } else {
+    lcd.print("--%");
+  }
+
+  lcd.setCursor(0, 1);
+  lcd.print("SCH:");
+  lcd.print(onIntervalSeconds);
+  lcd.print("/");
+  lcd.print(offIntervalSeconds);
   lcd.print("s");
+
+  lcd.setCursor(11, 1);
+  lcd.print("C:");
+  lcd.print(relayState ? "ZAP" : "VYP");
 }
 
 void displayMenuOff() {
@@ -272,14 +288,6 @@ void readDHTSensor() {
     if (!isnan(h) && !isnan(t) && t >= 0 && t <= 50 && h >= 20 && h <= 80) {
       humidity = h;
       temperature = t;
-      
-      Serial.print("Teplota: ");
-      Serial.print(temperature);
-      Serial.print("°C, Vlhkost: ");
-      Serial.print(humidity);
-      Serial.println("%");
-    } else {
-      Serial.println("Chyba pri čítaní DHT senzora alebo hodnoty mimo rozsahu!");
     }
   }
 }
