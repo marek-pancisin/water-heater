@@ -1,124 +1,61 @@
-#include <Arduino.h>
+// Include necessary libraries for LCD and Keypad Shield
 #include <LiquidCrystal.h>
+#include <Keypad.h>
 
-// Konfigurácia LCD (štandardné piny pre LCD Keypad Shield)
-LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+// Define pins for LCD
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
-// Konfigurácia pinov
-const int RELAY_PIN = 2;   // !!! ZMENENÉ z 7 na 2 (pin 7 používa LCD)
-const int LED_PIN = 13;    // LED indikácia
+// Define Keypad buttons
+const byte ROWS = 4; // Four rows
+const byte COLS = 4; // Four columns
+char keys[ROWS][COLS] = {{'1', '2', '3', 'A'},{'4', '5', '6', 'B'},{'7', '8', '9', 'C'},{'*', '0', '#', 'D'}};
+byte rowPins[ROWS] = {9, 8, 7, 6}; // Connect to the row pinouts of the keypad
+byte colPins[COLS] = {10, 11, 12, 13}; // Connect to the column pinouts of the keypad
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-// Nastavenie intervalov (v milisekundách)
-const unsigned long OFF_INTERVAL = 5000;  // 5 sekúnd vypnuté
-const unsigned long ON_INTERVAL = 1000;   // 1 sekunda zapnuté
-
-// Premenné pre sledovanie stavu
-bool relayState = false;           // Aktuálny stav relé
-unsigned long previousMillis = 0;  // Čas poslednej zmeny stavu
-unsigned long startTime = 0;       // Čas štartu
+// Global variables for intervals
+int onInterval = 10; // default ON interval
+int offInterval = 5; // default OFF interval
 
 void setup() {
-  Serial.begin(9600);
-  
-  // Inicializácia LCD (16 znakov x 2 riadky)
-lcd.begin(16, 2);
-  
-  pinMode(RELAY_PIN, OUTPUT);
-pinMode(LED_PIN, OUTPUT);
-  
-  // Štart s vypnutým relé
-digitalWrite(RELAY_PIN, LOW);
-digitalWrite(LED_PIN, LOW);
-  
-  // Úvodná správa na LCD
-lcd.clear();
-lcd.setCursor(0, 0);
-lcd.print("Water Heater");
-lcd.setCursor(0, 1);
-lcd.print("Starting...");
-delay(2000);
-  
-  startTime = millis();
-  
-  Serial.println("Arduino intervalový časovač s LCD");
-  Serial.print("Vypnuté: ");
-  Serial.print(OFF_INTERVAL / 1000);
-  Serial.println(" s");
-  Serial.print("Zapnuté: ");
-  Serial.print(ON_INTERVAL / 1000);
-  Serial.println(" s");
-}
-
-void updateLCD() {
-  lcd.clear();
-  
-  // Prvý riadok - stav
-  lcd.setCursor(0, 0);
-  if (relayState) {
-    lcd.print("STAV: ZAPNUTE");
-  } else {
-    lcd.print("STAV: VYPNUTE");
-  }
-  
-  // Druhý riadok - odpočítavanie
-  lcd.setCursor(0, 1);
-  unsigned long currentMillis = millis();
-  unsigned long elapsed = currentMillis - previousMillis;
-  unsigned long interval = relayState ? ON_INTERVAL : OFF_INTERVAL;
-  unsigned long remaining = (interval - elapsed) / 1000;
-  
-  if (relayState) {
-    lcd.print("Vyp za: ");
-  } else {
-    lcd.print("Zap za: ");
-  }
-  lcd.print(remaining);
-lcd.print("s ");
-  
-  // Celkový čas behu
-  unsigned long runtime = (currentMillis - startTime) / 1000;
-lcd.setCursor(0, 1);
-lcd.print("Cas: ");
-lcd.print(runtime);
-lcd.print("s");
+    lcd.begin(16, 2);
+    updateDisplay();
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
-  
-  // Zisti, aký interval má byť aktívny
-  unsigned long interval;
-  if (relayState) {
-    interval = ON_INTERVAL;
-  } else {
-    interval = OFF_INTERVAL;
-  }
-  
-  // Kontrola, či uplynul interval
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    
-    // Prepni stav
-    relayState = !relayState;
-    
-    // Nastav výstupy
-digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
-digitalWrite(LED_PIN, relayState ? HIGH : LOW);
-    
-    // Aktualizuj LCD
-    updateLCD();
-    
-    // Debug výpis
-    Serial.print("Čas: ");
-    Serial.print(currentMillis / 1000);
-    Serial.print("s | Relé: ");
-    Serial.println(relayState ? "ZAPNUTÉ" : "VYPNUTÉ");
-  }
-  
-  // Aktualizuj LCD každú sekundu (pre odpočítavanie)
-  static unsigned long lastLCDUpdate = 0;
-  if (currentMillis - lastLCDUpdate >= 1000) {
-    lastLCDUpdate = currentMillis;
-    updateLCD();
-  }
+    char key = keypad.getKey();
+    if (key) {
+        handleKey(key);
+    }
+}
+
+void handleKey(char key) {
+    switch (key) {
+        case 'A': // SELECT
+            // Code to save settings
+            break;
+        case 'B': // UP
+            onInterval++;
+            break;
+        case 'C': // DOWN
+            offInterval++;
+            break;
+        case 'D': // LEFT
+            // Decrease intervals if greater than 1
+            if (onInterval > 1) onInterval--;
+            break;
+        case '*': // RIGHT
+            // Code to go back to main menu
+            break;
+    }
+    updateDisplay();
+}
+
+void updateDisplay() {
+    lcd.clear();
+    lcd.print("ON: ");
+    lcd.print(onInterval);
+    lcd.setCursor(0, 1);
+    lcd.print("OFF: ");
+    lcd.print(offInterval);
 }
