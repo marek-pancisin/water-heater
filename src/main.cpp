@@ -89,7 +89,7 @@ void displayNormalMode() {
   lcd.clear();
   
   // Prvý riadok - stav a ikona
-  lcd.setCursor(0, 0);
+  lcd.setCursor(13, 0);
   if (relayState) {
     lcd.print("ZAP");
   } else {
@@ -102,8 +102,7 @@ void displayNormalMode() {
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
   unsigned long remaining = (interval - elapsed) / 1000;
   
-  lcd.setCursor(5, 0);
-  lcd.print("Za:");
+  lcd.setCursor(0, 0);
   lcd.print(remaining);
   lcd.print("s  ");
   
