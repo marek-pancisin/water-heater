@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 #include <EEPROM.h>
+#include <DHT.h>
 
 // Konfigurácia LCD (štandardné piny pre LCD Keypad Shield)
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
@@ -9,6 +10,11 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 const int RELAY_PIN = 3;   // Pin pre relé
 const int LED_PIN = 13;    // LED indikácia
 const int BUTTON_PIN = A0; // Analógový vstup pre tlačidlá
+const int DHT_PIN = 2;     // Pin pre DHT11 senzor
+
+// DHT11 senzor konfigurácia
+#define DHTTYPE DHT11
+DHT dht(DHT_PIN, DHTTYPE);
 
 // EEPROM adresy pre ukladanie nastavení
 const int EEPROM_ADDR_OFF = 0;    // Adresa pre OFF interval (2 bajty)
@@ -24,6 +30,12 @@ unsigned long onIntervalSeconds = 1;    // Default: 1 sekunda zapnuté
 bool relayState = false;
 unsigned long previousMillis = 0;
 unsigned long startTime = 0;
+
+// DHT senzor premenné
+float temperature = 0.0;
+float humidity = 0.0;
+unsigned long lastDHTRead = 0;
+const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 
 // Menu premenné
 enum MenuState { NORMAL, MENU_OFF, MENU_ON }; 
@@ -95,6 +107,9 @@ void setup() {
   digitalWrite(RELAY_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
   
+  // Inicializácia DHT senzora
+  dht.begin();
+  
   lcd.clear();
   lcd.print("Water Heater");
   lcd.setCursor(0, 1);
@@ -118,23 +133,28 @@ void setup() {
 
 void displayNormalMode() {
   lcd.clear();
-  lcd.setCursor(13, 0);
-  lcd.print(relayState ? "ZAP" : "VYP");
   
+  // Prvý riadok: Teplota a vlhkosť
+  lcd.setCursor(0, 0);
+  lcd.print("T:");
+  lcd.print(temperature, 1);
+  lcd.print("C H:");
+  lcd.print(humidity, 0);
+  lcd.print("%");
+  
+  // Druhý riadok: Zostávajúci čas a status
   unsigned long currentMillis = millis();
   unsigned long elapsed = currentMillis - previousMillis;
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
   unsigned long remaining = (interval - elapsed) / 1000;
   
-  lcd.setCursor(0, 0);
-  lcd.print(remaining);
-  lcd.print("s  ");
-  
   lcd.setCursor(0, 1);
-  lcd.print("ON:");
-  lcd.print(onIntervalSeconds);
-  lcd.print("s OFF:");
-  lcd.print(offIntervalSeconds);
+  if (relayState) {
+    lcd.print("ZAP:");
+  } else {
+    lcd.print("VYP:");
+  }
+  lcd.print(remaining);
   lcd.print("s");
 }
 
@@ -230,7 +250,32 @@ void controlRelay() {
   }
 }
 
+void readDHTSensor() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastDHTRead >= DHT_READ_INTERVAL) {
+    lastDHTRead = currentMillis;
+    
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+    
+    // Kontrola, či sa podarilo prečítať údaje
+    if (!isnan(h) && !isnan(t)) {
+      humidity = h;
+      temperature = t;
+      
+      Serial.print("Teplota: ");
+      Serial.print(temperature);
+      Serial.print("°C, Vlhkost: ");
+      Serial.print(humidity);
+      Serial.println("%");
+    } else {
+      Serial.println("Chyba pri citani DHT senzora!");
+    }
+  }
+}
+
 void loop() {
+  readDHTSensor();
   handleButtons();
   controlRelay();
   
