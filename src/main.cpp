@@ -137,10 +137,19 @@ void displayNormalMode() {
   // Prvý riadok: Teplota a vlhkosť
   lcd.setCursor(0, 0);
   lcd.print("T:");
-  lcd.print(temperature, 1);
-  lcd.print("C H:");
-  lcd.print(humidity, 0);
-  lcd.print("%");
+  if (temperature >= -9.9 && temperature <= 99.9) {
+    lcd.print(temperature, 1);
+    lcd.print("C");
+  } else {
+    lcd.print("--.-C");
+  }
+  lcd.print(" H:");
+  if (humidity >= 0 && humidity <= 100) {
+    lcd.print(humidity, 0);
+    lcd.print("%");
+  } else {
+    lcd.print("--%");
+  }
   
   // Druhý riadok: Zostávajúci čas a status
   unsigned long currentMillis = millis();
@@ -258,8 +267,9 @@ void readDHTSensor() {
     float h = dht.readHumidity();
     float t = dht.readTemperature();
     
-    // Kontrola, či sa podarilo prečítať údaje
-    if (!isnan(h) && !isnan(t)) {
+    // Kontrola, či sa podarilo prečítať údaje a či sú v platnom rozsahu
+    // DHT11 rozsah: 0-50°C, 20-80% vlhkosť
+    if (!isnan(h) && !isnan(t) && t >= 0 && t <= 50 && h >= 20 && h <= 80) {
       humidity = h;
       temperature = t;
       
@@ -269,7 +279,7 @@ void readDHTSensor() {
       Serial.print(humidity);
       Serial.println("%");
     } else {
-      Serial.println("Chyba pri citani DHT senzora!");
+      Serial.println("Chyba pri čítaní DHT senzora alebo hodnoty mimo rozsahu!");
     }
   }
 }
