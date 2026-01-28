@@ -41,7 +41,7 @@ const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 enum MenuState { NORMAL, MENU_OFF, MENU_ON }; 
 MenuState menuState = NORMAL;
 unsigned long lastButtonPress = 0;
-const unsigned long debounceDelay = 200;
+const unsigned long debounceDelay = 500;
 
 // Definície tlačidiel (hodnoty z ADC pre LCD Keypad Shield)
 enum Button { NONE, RIGHT, UP, DOWN, LEFT, SELECT };
@@ -128,24 +128,7 @@ void setup() {
 
 void displayNormalMode() {
   lcd.clear();  
-  // // Prvý riadok: Teplota a vlhkosť
-  // lcd.setCursor(0, 0);
-  // lcd.print("T:");
-  // if (temperature >= -9.9 && temperature <= 99.9) {
-  //   lcd.print(temperature, 1);
-  //   lcd.print("C");
-  // } else {
-  //   lcd.print("--.-C");
-  // }
-  // lcd.print(" H:");
-  // if (humidity >= 0 && humidity <= 100) {
-  //   lcd.print(humidity, 0);
-  //   lcd.print("%");
-  // } else {
-  //   lcd.print("--%");
-  // }
-  
-  // Druhý riadok: Zostávajúci čas a status
+
   unsigned long currentMillis = millis();
   unsigned long elapsed = currentMillis - previousMillis;
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
