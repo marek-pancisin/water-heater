@@ -36,6 +36,7 @@ const int EEPROM_ADDR_ON = 2;     // Adresa pre ON interval (2 bajty)
 const int EEPROM_ADDR_MAGIC = 4;  // Magic byte pre kontrolu inicializácie
 const int EEPROM_ADDR_MODE = 5;   // Adresa pre režim (1 bajt)
 const int EEPROM_ADDR_DEST_TEMP = 6; // Adresa pre cieľovú teplotu (2 bajty)
+const int EEPROM_ADDR_SIMULATION = 8; // Adresa pre simulačný režim (1 bajt)
 const byte EEPROM_MAGIC = 0xAB;   // Magic hodnota
 
 // Režimy ovládania
@@ -49,6 +50,9 @@ unsigned long onIntervalSeconds = 1;    // Default: 1 sekunda zapnuté
 // Nastavenie cieľovej teploty (pre automatický režim)
 int destinationTemperature = 50;  // Default: 50°C
 
+// Simulačný režim
+bool simulationEnabled = false;  // Default: vypnutý
+
 // Premenné pre sledovanie stavu
 bool relayState = false;
 unsigned long previousMillis = 0;
@@ -61,7 +65,7 @@ unsigned long lastDHTRead = 0;
 const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 
 // Menu premenné
-enum MenuState { NORMAL, MENU_MODE, MENU_OFF, MENU_ON, MENU_DEST_TEMP, DETAIL_TEMP }; 
+enum MenuState { NORMAL, MENU_MODE, MENU_OFF, MENU_ON, MENU_DEST_TEMP, MENU_SIMULATION, DETAIL_TEMP }; 
 MenuState menuState = NORMAL;
 unsigned long lastButtonPress = 0;
 const unsigned long debounceDelay = 200;
@@ -137,6 +141,7 @@ void saveToEEPROM() {
   EEPROM.write(EEPROM_ADDR_MODE, (byte)currentMode);
   EEPROM.write(EEPROM_ADDR_DEST_TEMP, destinationTemperature & 0xFF);
   EEPROM.write(EEPROM_ADDR_DEST_TEMP + 1, (destinationTemperature >> 8) & 0xFF);
+  EEPROM.write(EEPROM_ADDR_SIMULATION, simulationEnabled ? 1 : 0);
   EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC);
 }
 
@@ -162,6 +167,9 @@ void loadFromEEPROM() {
   lowByte = EEPROM.read(EEPROM_ADDR_DEST_TEMP);
   highByte = EEPROM.read(EEPROM_ADDR_DEST_TEMP + 1);
   destinationTemperature = (highByte << 8) | lowByte;
+  
+  byte simulationValue = EEPROM.read(EEPROM_ADDR_SIMULATION);
+  simulationEnabled = (simulationValue == 1);
   
   if (offIntervalSeconds < 1 || offIntervalSeconds > 999) offIntervalSeconds = 5;
   if (onIntervalSeconds < 1 || onIntervalSeconds > 999) onIntervalSeconds = 1;
@@ -291,6 +299,18 @@ void displayMenuDestTemp() {
   lcd.print(" °C");
 }
 
+void displayMenuSimulation() {
+  lcd.clear();
+  lcd.print("SIMULACIA:");
+  lcd.setCursor(0, 1);
+  lcd.print(">> ");
+  if (simulationEnabled) {
+    lcd.print("ZAPNUTA");
+  } else {
+    lcd.print("VYPNUTA");
+  }
+}
+
 void displaySaving() {
   lcd.clear();
   lcd.print("Ukladam do");
@@ -324,13 +344,9 @@ void handleButtons() {
           displayMenuDestTemp();
         }
       } else if (btn == LEFT) {
-        if (currentMode == MANUAL) {
-          menuState = MENU_ON;
-          displayMenuOn();
-        } else {
-          menuState = MENU_DEST_TEMP;
-          displayMenuDestTemp();
-        }
+        // Navigate to simulation menu
+        menuState = MENU_SIMULATION;
+        displayMenuSimulation();
       } else if (btn == SELECT) {
         displaySaving();
         saveToEEPROM();
@@ -351,8 +367,8 @@ void handleButtons() {
         menuState = MENU_ON;
         displayMenuOn();
       } else if (btn == LEFT) {
-        menuState = MENU_MODE;
-        displayMenuMode();
+        menuState = MENU_SIMULATION;
+        displayMenuSimulation();
       } else if (btn == SELECT) {
         displaySaving();
         saveToEEPROM();
@@ -373,8 +389,8 @@ void handleButtons() {
         menuState = MENU_OFF;
         displayMenuOff();
       } else if (btn == RIGHT) {
-        menuState = MENU_MODE;
-        displayMenuMode();
+        menuState = MENU_SIMULATION;
+        displayMenuSimulation();
       } else if (btn == SELECT) {
         displaySaving();
         saveToEEPROM();
@@ -392,6 +408,30 @@ void handleButtons() {
         if (destinationTemperature > 1) destinationTemperature--;
         displayMenuDestTemp();
       } else if (btn == RIGHT || btn == LEFT) {
+        menuState = MENU_SIMULATION;
+        displayMenuSimulation();
+      } else if (btn == SELECT) {
+        displaySaving();
+        saveToEEPROM();
+        menuState = NORMAL;
+        displayNormalMode();
+      }
+      break;
+      
+    case MENU_SIMULATION:
+      if (btn == UP || btn == DOWN) {
+        simulationEnabled = !simulationEnabled;
+        displayMenuSimulation();
+      } else if (btn == RIGHT) {
+        // Navigate to mode-specific submenu
+        if (currentMode == MANUAL) {
+          menuState = MENU_OFF;
+          displayMenuOff();
+        } else {
+          menuState = MENU_DEST_TEMP;
+          displayMenuDestTemp();
+        }
+      } else if (btn == LEFT) {
         menuState = MENU_MODE;
         displayMenuMode();
       } else if (btn == SELECT) {
@@ -413,8 +453,14 @@ void controlRelay() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     relayState = !relayState;
-    digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
-    digitalWrite(LED_PIN, relayState ? HIGH : LOW);
+    
+    // In simulation mode, only update LED but not relay
+    if (simulationEnabled) {
+      digitalWrite(LED_PIN, relayState ? HIGH : LOW);
+    } else {
+      digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
+      digitalWrite(LED_PIN, relayState ? HIGH : LOW);
+    }
   }
 }
 
