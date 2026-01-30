@@ -169,7 +169,7 @@ void loadFromEEPROM() {
   destinationTemperature = (highByte << 8) | lowByte;
   
   byte simulationValue = EEPROM.read(EEPROM_ADDR_SIMULATION);
-  simulationEnabled = (simulationValue == 1);
+  simulationEnabled = (simulationValue == 1) ? true : false;
   
   if (offIntervalSeconds < 1 || offIntervalSeconds > 999) offIntervalSeconds = 5;
   if (onIntervalSeconds < 1 || onIntervalSeconds > 999) onIntervalSeconds = 1;
@@ -335,15 +335,7 @@ void handleButtons() {
       if (btn == UP || btn == DOWN) {
         currentMode = (currentMode == MANUAL) ? AUTOMATIC : MANUAL;
         displayMenuMode();
-      } else if (btn == RIGHT) {
-        if (currentMode == MANUAL) {
-          menuState = MENU_OFF;
-          displayMenuOff();
-        } else {
-          menuState = MENU_DEST_TEMP;
-          displayMenuDestTemp();
-        }
-      } else if (btn == LEFT) {
+      } else if (btn == RIGHT || btn == LEFT) {
         // Navigate to simulation menu
         menuState = MENU_SIMULATION;
         displayMenuSimulation();
@@ -454,12 +446,12 @@ void controlRelay() {
     previousMillis = currentMillis;
     relayState = !relayState;
     
-    // In simulation mode, only update LED but not relay
-    if (simulationEnabled) {
-      digitalWrite(LED_PIN, relayState ? HIGH : LOW);
-    } else {
+    // Update LED in all modes
+    digitalWrite(LED_PIN, relayState ? HIGH : LOW);
+    
+    // In simulation mode, don't update relay; in normal mode, update relay
+    if (!simulationEnabled) {
       digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
-      digitalWrite(LED_PIN, relayState ? HIGH : LOW);
     }
   }
 }
