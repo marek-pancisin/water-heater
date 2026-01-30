@@ -8,10 +8,11 @@ This document describes the menu navigation flow for the mode setup feature.
 
 1. **NORMAL** - Normal operation display
 2. **MENU_MODE** - Mode selection (Manual/Automatic)
-3. **MENU_OFF** - Timer OFF interval configuration (Manual mode only)
-4. **MENU_ON** - Timer ON interval configuration (Manual mode only)
-5. **MENU_DEST_TEMP** - Destination temperature configuration (Automatic mode only)
-6. **DETAIL_TEMP** - Temperature detail view
+3. **MENU_SIMULATION** - Simulation mode configuration
+4. **MENU_OFF** - Timer OFF interval configuration (Manual mode only)
+5. **MENU_ON** - Timer ON interval configuration (Manual mode only)
+6. **MENU_DEST_TEMP** - Destination temperature configuration (Automatic mode only)
+7. **DETAIL_TEMP** - Temperature detail view
 
 ## Navigation Flow
 
@@ -23,12 +24,19 @@ Display: `REZIM: >> MANUALNY` or `REZIM: >> AUTOMATICKY`
 
 Buttons:
 - **UP/DOWN** - Toggle between MANUAL and AUTOMATIC modes
-- **RIGHT** - Navigate to next menu:
+- **RIGHT** - Navigate to **MENU_SIMULATION**
+- **LEFT** - Navigate to **MENU_SIMULATION**
+- **SELECT** - Save all settings to EEPROM and return to **NORMAL**
+
+### Simulation Mode Menu (MENU_SIMULATION)
+Display: `SIMULACIA: >> ZAPNUTA` or `SIMULACIA: >> VYPNUTA`
+
+Buttons:
+- **UP/DOWN** - Toggle simulation mode ON/OFF
+- **RIGHT** - Navigate to mode-specific menu:
   - If MANUAL mode → **MENU_OFF**
   - If AUTOMATIC mode → **MENU_DEST_TEMP**
-- **LEFT** - Navigate to previous menu:
-  - If MANUAL mode → **MENU_ON**
-  - If AUTOMATIC mode → **MENU_DEST_TEMP**
+- **LEFT** - Navigate back to **MENU_MODE**
 - **SELECT** - Save all settings to EEPROM and return to **NORMAL**
 
 ### Manual Mode Menus
@@ -40,7 +48,7 @@ Buttons:
 - **UP** - Increase OFF interval (max 999 seconds)
 - **DOWN** - Decrease OFF interval (min 1 second)
 - **RIGHT** - Navigate to **MENU_ON**
-- **LEFT** - Navigate to **MENU_MODE**
+- **LEFT** - Navigate to **MENU_SIMULATION**
 - **SELECT** - Save settings to EEPROM and return to **NORMAL**
 
 #### Timer ON Menu (MENU_ON)
@@ -50,7 +58,7 @@ Buttons:
 - **UP** - Increase ON interval (max 999 seconds)
 - **DOWN** - Decrease ON interval (min 1 second)
 - **LEFT** - Navigate to **MENU_OFF**
-- **RIGHT** - Navigate to **MENU_MODE**
+- **RIGHT** - Navigate to **MENU_SIMULATION**
 - **SELECT** - Save settings to EEPROM and return to **NORMAL**
 
 ### Automatic Mode Menu
@@ -61,7 +69,7 @@ Display: `CILOVA TEPLOTA: >> X °C`
 Buttons:
 - **UP** - Increase destination temperature (max 99°C)
 - **DOWN** - Decrease destination temperature (min 1°C)
-- **RIGHT/LEFT** - Navigate back to **MENU_MODE**
+- **RIGHT/LEFT** - Navigate back to **MENU_SIMULATION**
 - **SELECT** - Save settings to EEPROM and return to **NORMAL**
 
 ## EEPROM Storage
@@ -75,6 +83,7 @@ The following values are stored in EEPROM:
 | 4 | 1 | Magic byte (0xAB) for validation |
 | 5 | 1 | Mode (0=MANUAL, 1=AUTOMATIC) |
 | 6 | 2 | Destination temperature (°C) |
+| 8 | 1 | Simulation mode (0=OFF, 1=ON) |
 
 ## Default Values
 
@@ -82,6 +91,7 @@ The following values are stored in EEPROM:
 - **OFF interval**: 5 seconds
 - **ON interval**: 1 second
 - **Destination temperature**: 50°C
+- **Simulation mode**: OFF (0)
 
 ## Validation Ranges
 
@@ -93,3 +103,4 @@ The following values are stored in EEPROM:
 
 - **Manual Mode**: Relay is controlled by timer intervals (existing behavior)
 - **Automatic Mode**: Relay control algorithm not yet implemented (reserved for future)
+- **Simulation Mode**: When enabled, relay switching is disabled but LED indication continues to work
