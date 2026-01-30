@@ -50,6 +50,7 @@ DS18B20 senzory pripojte na 1-Wire zbernicu:
 ## Funkcie
 
 - **Automatické ovládanie relé** - zapínanie/vypínanie podľa nastavených intervalov
+- **Emergency režim** - manuálne zapnutie relé na 10 sekúnd držaním RIGHT tlačidla na 5 sekúnd
 - **Meranie teploty a vlhkosti** - údaje z DHT11 senzora zobrazované na LCD
 - **Meranie vstupnej a výstupnej teploty** - presné meranie pomocou DS18B20 senzorov
 - **Výpočet delta teploty** - rozdiel medzi výstupom a vstupom
@@ -84,7 +85,15 @@ OUT:48.7°C Δ:3.5
 **Návrat:** Stlačte DOWN, LEFT, RIGHT alebo SELECT
 
 ### Režim nastavení (tlačidlo SELECT):
-Použite tlačidlá pre konfiguráciu ON/OFF intervalov.
+Použite tlačidlá pre konfiguráciu ON/OFF intervalov a emergency režimu.
+
+### Emergency režim:
+V normálnom režime, keď je emergency povolený v nastaveniach:
+- Držte **RIGHT** tlačidlo 5 sekúnd
+- Relé sa automaticky zapne na 10 sekúnd
+- Po 10 sekundách sa systém vráti do normálneho režimu
+
+**Poznámka:** Emergency režim musí byť najprv povolený v setup menu (SELECT → REZIM → SIMULACIA → EMERGENCY).
 
 ## Knižnice
 
@@ -127,6 +136,13 @@ IN: 45.2°C | OUT: 48.7°C | d: 3.5°C
 ```
 
 ## História verzií
+
+### V4.1 + Emergency Button
+- ✅ Emergency režim - manuálne zapnutie relé držaním RIGHT tlačidla
+- ✅ Konfigurovateľný emergency režim v setup menu
+- ✅ EEPROM uloženie emergency nastavenia
+- ✅ Automatické vypnutie relé po 10 sekundách
+- ✅ 5 sekundové držanie tlačidla pre aktiváciu
 
 ### V4.0 + DS18B20
 - ✅ Pridaných 2x DS18B20 teplotných senzorov
