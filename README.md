@@ -93,7 +93,7 @@ V normálnom režime, keď je emergency povolený v nastaveniach:
 - Relé sa automaticky zapne na 10 sekúnd
 - Po 10 sekundách sa systém vráti do normálneho režimu
 
-**Poznámka:** Emergency režim musí byť najprv povolený v setup menu (SELECT → REZIM → SIMULACIA → EMERGENCY).
+**Poznámka:** Emergency režim musí byť najprv povolený v setup menu (SELECT → použite RIGHT tlačidlo na navigáciu: REZIM → SIMULACIA → EMERGENCY → UP/DOWN pre zapnutie).
 
 ## Knižnice
 

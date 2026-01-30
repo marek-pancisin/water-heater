@@ -224,8 +224,10 @@ void checkEmergencyButton() {
       emergencyStartTime = millis();
       rightButtonPressStart = 0;
       
-      // Turn on relay for emergency
-      digitalWrite(RELAY_PIN, LOW); // LOW = relay ON
+      // Turn on relay for emergency (respect simulation mode)
+      if (!simulationEnabled) {
+        digitalWrite(RELAY_PIN, LOW); // LOW = relay ON
+      }
       digitalWrite(LED_PIN, HIGH);
     }
   } else if (currentButton != RIGHT) {
@@ -380,6 +382,9 @@ void displaySaving() {
 }
 
 void handleButtons() {
+  // Skip button processing during emergency mode
+  if (emergencyActive) return;
+  
   Button btn = getButton();
   if (btn == NONE) return;
   
@@ -531,6 +536,11 @@ void controlRelay() {
     if (currentMillis - emergencyStartTime >= EMERGENCY_DURATION) {
       // Emergency period ended, return to normal operation
       emergencyActive = false;
+      rightButtonHeld = false;
+      rightButtonPressStart = 0;
+      
+      // Reset timing to start fresh interval
+      previousMillis = millis();
       
       // Restore relay state based on current operation mode
       if (!simulationEnabled) {
