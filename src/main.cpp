@@ -2,6 +2,8 @@
 #include <LiquidCrystal.h>
 #include <EEPROM.h>
 #include <DHT.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 // Konfigurácia LCD (štandardné piny pre LCD Keypad Shield)
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
@@ -11,10 +13,22 @@ const int RELAY_PIN = 3;   // Pin pre relé
 const int LED_PIN = 13;    // LED indikácia
 const int BUTTON_PIN = A0; // Analógový vstup pre tlačidlá
 const int DHT_PIN = 2;     // Pin pre DHT11 senzor
+const int ONE_WIRE_BUS = A3; // Pin pre DS18B20 senzory
 
 // DHT11 senzor konfigurácia
 #define DHTTYPE DHT11
 DHT dht(DHT_PIN, DHTTYPE);
+
+// DS18B20 senzory konfigurácia
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+DeviceAddress sensorInput, sensorOutput;
+float tempInput = 0.0;
+float tempOutput = 0.0;
+float tempDelta = 0.0;
+unsigned long lastDS18B20Read = 0;
+const unsigned long DS18B20_READ_INTERVAL = 1000; // Čítaj každú sekundu
+bool ds18b20Available = false;
 
 // EEPROM adresy pre ukladanie nastavení
 const int EEPROM_ADDR_OFF = 0;    // Adresa pre OFF interval (2 bajty)
@@ -38,13 +52,79 @@ unsigned long lastDHTRead = 0;
 const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 
 // Menu premenné
-enum MenuState { NORMAL, MENU_OFF, MENU_ON }; 
+enum MenuState { NORMAL, MENU_OFF, MENU_ON, DETAIL_TEMP }; 
 MenuState menuState = NORMAL;
 unsigned long lastButtonPress = 0;
 const unsigned long debounceDelay = 500;
 
 // Definície tlačidiel (hodnoty z ADC pre LCD Keypad Shield)
 enum Button { NONE, RIGHT, UP, DOWN, LEFT, SELECT };
+
+// ========== DS18B20 funkcie ========== 
+
+void printAddress(DeviceAddress deviceAddress) {
+  for (uint8_t i = 0; i < 8; i++) {
+    if (deviceAddress[i] < 16) Serial.print("0");
+    Serial.print(deviceAddress[i], HEX);
+  }
+}
+
+void initDS18B20() {
+  sensors.begin();
+  int deviceCount = sensors.getDeviceCount();
+  
+  Serial.print("Najdenych DS18B20: ");
+  Serial.println(deviceCount);
+  
+  if (deviceCount >= 2) {
+    sensors.getAddress(sensorInput, 0);
+    sensors.getAddress(sensorOutput, 1);
+    
+    Serial.print("Senzor 0 (Vstup): ");
+    printAddress(sensorInput);
+    Serial.println();
+    
+    Serial.print("Senzor 1 (Vystup): ");
+    printAddress(sensorOutput);
+    Serial.println();
+    
+    sensors.setResolution(sensorInput, 12);
+    sensors.setResolution(sensorOutput, 12);
+    
+    ds18b20Available = true;
+  } else {
+    Serial.println("Chyba: Nenasli sa 2 DS18B20 senzory!");
+    ds18b20Available = false;
+  }
+}
+
+void readDS18B20() {
+  if (!ds18b20Available) return;
+  
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastDS18B20Read >= DS18B20_READ_INTERVAL) {
+    lastDS18B20Read = currentMillis;
+    
+    sensors.requestTemperatures();
+    
+    float tIn = sensors.getTempC(sensorInput);
+    float tOut = sensors.getTempC(sensorOutput);
+    
+    if (tIn != DEVICE_DISCONNECTED_C && tOut != DEVICE_DISCONNECTED_C) {
+      tempInput = tIn;
+      tempOutput = tOut;
+      tempDelta = tempOutput - tempInput;
+      
+      Serial.print("IN: ");
+      Serial.print(tempInput, 1);
+      Serial.print("°C | OUT: ");
+      Serial.print(tempOutput, 1);
+      Serial.print("°C | d: ");
+      Serial.print(tempDelta, 1);
+      Serial.println("°C");
+    }
+  }
+}
 
 // ========== EEPROM funkcie ========== 
 
@@ -105,10 +185,11 @@ void setup() {
   // Inicializácia DHT senzora
   dht.begin();
   
+  // Inicializácia DS18B20 senzorov
+  initDS18B20();
+  
   lcd.clear();
-  lcd.print("Water Heater");
-  lcd.setCursor(0, 1);
-  lcd.print("V2.0 - EEPROM");
+  lcd.print("Water Heater V4.0");
   delay(2000);
   
   loadFromEEPROM();
@@ -138,7 +219,7 @@ void displayNormalMode() {
   lcd.print(remaining);
   lcd.print("s  ");
   
-  lcd.setCursor(7, 0);
+  lcd.setCursor(4, 0);
   if (temperature >= -9.9 && temperature <= 99.9) {
     lcd.print(temperature, 1);
     lcd.print("C");
@@ -146,24 +227,35 @@ void displayNormalMode() {
     lcd.print("--.-C");
   }
 
-  lcd.setCursor(13, 0);
-  if (humidity >= 0 && humidity <= 99) {
-    lcd.print(humidity, 0);
-    lcd.print("%");
-  } else {
-    lcd.print("--%");
-  }
+  // lcd.setCursor(13, 0);
+  // if (humidity >= 0 && humidity <= 99) {
+  //   lcd.print(humidity, 0);
+  //   lcd.print("%");
+  // } else {
+  //   lcd.print("--%");
+  // }
 
   lcd.setCursor(0, 1);
-  lcd.print("SCH:");
+  lcd.print("S:");
   lcd.print(onIntervalSeconds);
   lcd.print("/");
   lcd.print(offIntervalSeconds);
-  lcd.print("s");
+
+  lcd.setCursor(11, 0);
+  if (ds18b20Available && tempOutput >= -55 && tempOutput <= 125) {
+    lcd.print(tempOutput, 2);
+  } else {
+    lcd.print("--.--");
+  }
 
   lcd.setCursor(11, 1);
-  lcd.print("C:");
-  lcd.print(relayState ? "ZAP" : "VYP");
+  // lcd.print("C:");
+  // lcd.print(relayState ? "ZAP" : "VYP");
+  if (ds18b20Available && tempInput >= -55 && tempInput <= 125) {
+    lcd.print(tempInput, 2);
+  } else {
+    lcd.print("--.--");
+  }
 }
 
 void displayMenuOff() {
@@ -277,6 +369,7 @@ void readDHTSensor() {
 
 void loop() {
   readDHTSensor();
+  readDS18B20();
   handleButtons();
   controlRelay();
   
