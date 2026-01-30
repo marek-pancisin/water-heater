@@ -34,11 +34,20 @@ bool ds18b20Available = false;
 const int EEPROM_ADDR_OFF = 0;    // Adresa pre OFF interval (2 bajty)
 const int EEPROM_ADDR_ON = 2;     // Adresa pre ON interval (2 bajty)
 const int EEPROM_ADDR_MAGIC = 4;  // Magic byte pre kontrolu inicializácie
+const int EEPROM_ADDR_MODE = 5;   // Adresa pre režim (1 bajt)
+const int EEPROM_ADDR_DEST_TEMP = 6; // Adresa pre cieľovú teplotu (2 bajty)
 const byte EEPROM_MAGIC = 0xAB;   // Magic hodnota
+
+// Režimy ovládania
+enum ControlMode { MANUAL, AUTOMATIC };
+ControlMode currentMode = MANUAL;  // Default: manuálny režim
 
 // Nastavenie intervalov (v sekundách)
 unsigned long offIntervalSeconds = 5;   // Default: 5 sekúnd vypnuté
 unsigned long onIntervalSeconds = 1;    // Default: 1 sekunda zapnuté
+
+// Nastavenie cieľovej teploty (pre automatický režim)
+int destinationTemperature = 50;  // Default: 50°C
 
 // Premenné pre sledovanie stavu
 bool relayState = false;
@@ -52,7 +61,7 @@ unsigned long lastDHTRead = 0;
 const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 
 // Menu premenné
-enum MenuState { NORMAL, MENU_OFF, MENU_ON, DETAIL_TEMP }; 
+enum MenuState { NORMAL, MENU_MODE, MENU_OFF, MENU_ON, MENU_DEST_TEMP, DETAIL_TEMP }; 
 MenuState menuState = NORMAL;
 unsigned long lastButtonPress = 0;
 const unsigned long debounceDelay = 500;
@@ -133,6 +142,9 @@ void saveToEEPROM() {
   EEPROM.write(EEPROM_ADDR_OFF + 1, (offIntervalSeconds >> 8) & 0xFF);
   EEPROM.write(EEPROM_ADDR_ON, onIntervalSeconds & 0xFF);
   EEPROM.write(EEPROM_ADDR_ON + 1, (onIntervalSeconds >> 8) & 0xFF);
+  EEPROM.write(EEPROM_ADDR_MODE, (byte)currentMode);
+  EEPROM.write(EEPROM_ADDR_DEST_TEMP, destinationTemperature & 0xFF);
+  EEPROM.write(EEPROM_ADDR_DEST_TEMP + 1, (destinationTemperature >> 8) & 0xFF);
   EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC);
 }
 
@@ -152,8 +164,16 @@ void loadFromEEPROM() {
   highByte = EEPROM.read(EEPROM_ADDR_ON + 1);
   onIntervalSeconds = (highByte << 8) | lowByte;
   
+  byte modeValue = EEPROM.read(EEPROM_ADDR_MODE);
+  currentMode = (modeValue == 0 || modeValue == 1) ? (ControlMode)modeValue : MANUAL;
+  
+  lowByte = EEPROM.read(EEPROM_ADDR_DEST_TEMP);
+  highByte = EEPROM.read(EEPROM_ADDR_DEST_TEMP + 1);
+  destinationTemperature = (highByte << 8) | lowByte;
+  
   if (offIntervalSeconds < 1 || offIntervalSeconds > 999) offIntervalSeconds = 5;
   if (onIntervalSeconds < 1 || onIntervalSeconds > 999) onIntervalSeconds = 1;
+  if (destinationTemperature < 1 || destinationTemperature > 99) destinationTemperature = 50;
 }
 
 Button readButton() {
@@ -276,6 +296,27 @@ void displayMenuOn() {
   lcd.print(" sekund");
 }
 
+void displayMenuMode() {
+  lcd.clear();
+  lcd.print("REZIM:");
+  lcd.setCursor(0, 1);
+  lcd.print(">> ");
+  if (currentMode == MANUAL) {
+    lcd.print("MANUALNY");
+  } else {
+    lcd.print("AUTOMATICKY");
+  }
+}
+
+void displayMenuDestTemp() {
+  lcd.clear();
+  lcd.print("CILOVA TEPLOTA:");
+  lcd.setCursor(0, 1);
+  lcd.print(">> ");
+  lcd.print(destinationTemperature);
+  lcd.print(" °C");
+}
+
 void displaySaving() {
   lcd.clear();
   lcd.print("Ukladam do");
@@ -291,8 +332,36 @@ void handleButtons() {
   switch (menuState) {
     case NORMAL:
       if (btn == SELECT) {
-        menuState = MENU_OFF;
-        displayMenuOff();
+        menuState = MENU_MODE;
+        displayMenuMode();
+      }
+      break;
+      
+    case MENU_MODE:
+      if (btn == UP || btn == DOWN) {
+        currentMode = (currentMode == MANUAL) ? AUTOMATIC : MANUAL;
+        displayMenuMode();
+      } else if (btn == RIGHT) {
+        if (currentMode == MANUAL) {
+          menuState = MENU_OFF;
+          displayMenuOff();
+        } else {
+          menuState = MENU_DEST_TEMP;
+          displayMenuDestTemp();
+        }
+      } else if (btn == LEFT) {
+        if (currentMode == MANUAL) {
+          menuState = MENU_ON;
+          displayMenuOn();
+        } else {
+          menuState = MENU_DEST_TEMP;
+          displayMenuDestTemp();
+        }
+      } else if (btn == SELECT) {
+        displaySaving();
+        saveToEEPROM();
+        menuState = NORMAL;
+        displayNormalMode();
       }
       break;
       
@@ -304,9 +373,12 @@ void handleButtons() {
       } else if (btn == DOWN) {
         if (offIntervalSeconds > 1) offIntervalSeconds--;
         displayMenuOff();
-      } else if (btn == RIGHT || btn == LEFT) {
+      } else if (btn == RIGHT) {
         menuState = MENU_ON;
         displayMenuOn();
+      } else if (btn == LEFT) {
+        menuState = MENU_MODE;
+        displayMenuMode();
       } else if (btn == SELECT) {
         displaySaving();
         saveToEEPROM();
@@ -323,9 +395,31 @@ void handleButtons() {
       } else if (btn == DOWN) {
         if (onIntervalSeconds > 1) onIntervalSeconds--;
         displayMenuOn();
-      } else if (btn == RIGHT || btn == LEFT) {
+      } else if (btn == LEFT) {
         menuState = MENU_OFF;
         displayMenuOff();
+      } else if (btn == RIGHT) {
+        menuState = MENU_MODE;
+        displayMenuMode();
+      } else if (btn == SELECT) {
+        displaySaving();
+        saveToEEPROM();
+        menuState = NORMAL;
+        displayNormalMode();
+      }
+      break;
+      
+    case MENU_DEST_TEMP:
+      if (btn == UP) {
+        destinationTemperature++;
+        if (destinationTemperature > 99) destinationTemperature = 99;
+        displayMenuDestTemp();
+      } else if (btn == DOWN) {
+        if (destinationTemperature > 1) destinationTemperature--;
+        displayMenuDestTemp();
+      } else if (btn == RIGHT || btn == LEFT) {
+        menuState = MENU_MODE;
+        displayMenuMode();
       } else if (btn == SELECT) {
         displaySaving();
         saveToEEPROM();
