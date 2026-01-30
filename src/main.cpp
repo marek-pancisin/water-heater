@@ -55,7 +55,7 @@ const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 enum MenuState { NORMAL, MENU_OFF, MENU_ON, DETAIL_TEMP }; 
 MenuState menuState = NORMAL;
 unsigned long lastButtonPress = 0;
-const unsigned long debounceDelay = 500;
+const unsigned long debounceDelay = 200;
 
 // Definície tlačidiel (hodnoty z ADC pre LCD Keypad Shield)
 enum Button { NONE, RIGHT, UP, DOWN, LEFT, SELECT };
@@ -114,14 +114,6 @@ void readDS18B20() {
       tempInput = tIn;
       tempOutput = tOut;
       tempDelta = tempOutput - tempInput;
-      
-      Serial.print("IN: ");
-      Serial.print(tempInput, 1);
-      Serial.print("°C | OUT: ");
-      Serial.print(tempOutput, 1);
-      Serial.print("°C | d: ");
-      Serial.print(tempDelta, 1);
-      Serial.println("°C");
     }
   }
 }
@@ -189,20 +181,12 @@ void setup() {
   initDS18B20();
   
   lcd.clear();
-  lcd.print("Water Heater V4.0");
+  lcd.print("Water Heater");
+  lcd.setCursor(0, 1);
+  lcd.print("V4.0 - DS18B20");
   delay(2000);
   
   loadFromEEPROM();
-  
-  lcd.clear();
-  lcd.print("Nacitane:");
-  lcd.setCursor(0, 1);
-  lcd.print("ON:");
-  lcd.print(onIntervalSeconds);
-  lcd.print("s OFF:");
-  lcd.print(offIntervalSeconds);
-  lcd.print("s");
-  delay(2000);
   
   startTime = millis();
 }
@@ -227,14 +211,6 @@ void displayNormalMode() {
     lcd.print("--.-C");
   }
 
-  // lcd.setCursor(13, 0);
-  // if (humidity >= 0 && humidity <= 99) {
-  //   lcd.print(humidity, 0);
-  //   lcd.print("%");
-  // } else {
-  //   lcd.print("--%");
-  // }
-
   lcd.setCursor(0, 1);
   lcd.print("S:");
   lcd.print(onIntervalSeconds);
@@ -249,8 +225,6 @@ void displayNormalMode() {
   }
 
   lcd.setCursor(11, 1);
-  // lcd.print("C:");
-  // lcd.print(relayState ? "ZAP" : "VYP");
   if (ds18b20Available && tempInput >= -55 && tempInput <= 125) {
     lcd.print(tempInput, 2);
   } else {
