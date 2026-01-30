@@ -165,7 +165,7 @@ void loadFromEEPROM() {
   onIntervalSeconds = (highByte << 8) | lowByte;
   
   byte modeValue = EEPROM.read(EEPROM_ADDR_MODE);
-  currentMode = (modeValue == 0) ? MANUAL : AUTOMATIC;
+  currentMode = (modeValue == 0 || modeValue == 1) ? (ControlMode)modeValue : MANUAL;
   
   lowByte = EEPROM.read(EEPROM_ADDR_DEST_TEMP);
   highByte = EEPROM.read(EEPROM_ADDR_DEST_TEMP + 1);
