@@ -169,7 +169,7 @@ void loadFromEEPROM() {
   destinationTemperature = (highByte << 8) | lowByte;
   
   byte simulationValue = EEPROM.read(EEPROM_ADDR_SIMULATION);
-  simulationEnabled = (simulationValue == 1) ? true : false;
+  simulationEnabled = (simulationValue == 1);
   
   if (offIntervalSeconds < 1 || offIntervalSeconds > 999) offIntervalSeconds = 5;
   if (onIntervalSeconds < 1 || onIntervalSeconds > 999) onIntervalSeconds = 1;
@@ -412,8 +412,18 @@ void handleButtons() {
       
     case MENU_SIMULATION:
       if (btn == UP || btn == DOWN) {
+        bool previousSimulation = simulationEnabled;
         simulationEnabled = !simulationEnabled;
         displayMenuSimulation();
+        
+        // When entering simulation mode, ensure relay is OFF for safety
+        if (!previousSimulation && simulationEnabled) {
+          digitalWrite(RELAY_PIN, HIGH); // HIGH = relay OFF
+        }
+        // When exiting simulation mode, sync relay to current state
+        if (previousSimulation && !simulationEnabled) {
+          digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
+        }
       } else if (btn == RIGHT) {
         // Navigate to mode-specific submenu
         if (currentMode == MANUAL) {
