@@ -150,6 +150,14 @@ IN: 45.2°C | OUT: 48.7°C | d: 3.5°C
 
 ## História verzií
 
+### V5.1 + Dynamic Relay Timing
+- ✅ Dynamické výpočty času zapnutia relé na základe rozdielu teplôt
+- ✅ Lineárna interpolácia: 0ms (rozdiel ≥5°C) až 3000ms (rozdiel ≤-2°C)
+- ✅ Grafy a koeficienty pre mapovanie teploty na čas relé
+- ✅ Automatické prispôsobenie času zapnutia podľa situácie
+- ✅ Odstránené fixné časové intervaly 500ms/1000ms
+- ✅ Jeden univerzálny algoritmus pre oba stavy (HEATING, CYCLE)
+
 ### V5.0 + Automatic Mode Algorithm
 - ✅ Implementácia 3-stavového algoritmu pre automatický režim
 - ✅ AUTO_OFF stav - monitorovanie začiatku ohrevu
