@@ -190,6 +190,7 @@ The automatic mode implements a 3-state state machine that intelligently control
 - `AUTO_TEMP_OFFSET_OFF`: 2.0°C - Offset to detect heating has started
 - `AUTO_TEMP_OFFSET_HEATING`: 3.0°C - Offset to maintain during heating phase
 - `AUTO_TEMP_OFFSET_CYCLE`: 1.5°C - Offset during temperature maintenance
+- `AUTO_TEMP_DROP_THRESHOLD`: 5.0°C - Temperature drop to trigger return to heating
 - `AUTO_DECISION_INTERVAL`: 60 seconds - Time between algorithm decisions
 - `AUTO_RELAY_PULSE_SHORT`: 500ms - Short pulse duration for heating phase
 - `AUTO_RELAY_PULSE_LONG`: 1000ms - Long pulse duration for maintenance phase
@@ -200,7 +201,7 @@ When in automatic mode, the LCD displays:
 - **Row 1**: Relay status, time info, Input temperature
   - Example: `OFF:45s   I:45.2`
 - **Row 2**: Mode (A:), Current state number, Destination temperature, Output temperature
-  - Example: `A:1:50C  O:48.7`
+  - Example: `A:1:50C   O:48.7`
   - State numbers: 0=OFF, 1=HEATING, 2=CYCLE
 
 #### Serial Output

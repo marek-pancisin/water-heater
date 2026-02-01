@@ -67,13 +67,13 @@ DS18B20 senzory pripojte na 1-Wire zbernicu:
 **Manuálny režim:**
 ```
 OFF:3s    I:18.3
-M:1/105s  O:23.5
+M:1/5s    O:23.5
 ```
 
 **Automatický režim:**
 ```
 OFF:45s   I:45.2
-A:1:50C  O:48.7
+A:1:50C   O:48.7
 ```
 - **Riadok 1**: 
   - OFF/ON stav relé

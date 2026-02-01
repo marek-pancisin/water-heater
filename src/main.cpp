@@ -56,6 +56,7 @@ unsigned long onIntervalSeconds = 1;    // Default: 1 sekunda zapnuté
 const float AUTO_TEMP_OFFSET_OFF = 2.0;           // Temperature offset for OFF state detection (°C)
 const float AUTO_TEMP_OFFSET_HEATING = 3.0;       // Temperature offset to maintain during heating (°C)
 const float AUTO_TEMP_OFFSET_CYCLE = 1.5;         // Temperature offset during continuing cycle (°C)
+const float AUTO_TEMP_DROP_THRESHOLD = 5.0;       // Temperature drop threshold to return to heating (°C)
 const unsigned long AUTO_DECISION_INTERVAL = 60000; // Decision interval: 60 seconds
 const unsigned long AUTO_RELAY_PULSE_SHORT = 500;   // Short relay pulse: 500ms
 const unsigned long AUTO_RELAY_PULSE_LONG = 1000;   // Long relay pulse: 1000ms
@@ -168,7 +169,12 @@ void readDS18B20() {
       
       if (currentMode == AUTOMATIC) {
         Serial.print(" | Mode: AUTO State: ");
-        Serial.print(autoState);
+        // Print state name for better readability
+        switch (autoState) {
+          case AUTO_OFF: Serial.print("OFF"); break;
+          case AUTO_HEATING_STARTED: Serial.print("HEATING"); break;
+          case AUTO_CONTINUING_CYCLE: Serial.print("CYCLE"); break;
+        }
       }
       
       Serial.println();
@@ -693,7 +699,12 @@ void controlRelayAutomatic() {
   float tempDiff = tempOutput - tempInput;
   
   Serial.print("AUTO Decision - State: ");
-  Serial.print(autoState);
+  // Print state name for better readability
+  switch (autoState) {
+    case AUTO_OFF: Serial.print("OFF"); break;
+    case AUTO_HEATING_STARTED: Serial.print("HEATING"); break;
+    case AUTO_CONTINUING_CYCLE: Serial.print("CYCLE"); break;
+  }
   Serial.print(" | IN: ");
   Serial.print(tempInput, 1);
   Serial.print("°C | OUT: ");
@@ -740,7 +751,7 @@ void controlRelayAutomatic() {
     case AUTO_CONTINUING_CYCLE:
       // State 3: Continuing cycle - maintain temperature at destination
       // Check if output temperature drops significantly below destination
-      if (tempOutput < destinationTemperature - 5.0) {
+      if (tempOutput < destinationTemperature - AUTO_TEMP_DROP_THRESHOLD) {
         // Return to heating state if temperature drops too much
         autoState = AUTO_HEATING_STARTED;
         Serial.println("AUTO: Return to HEATING_STARTED - temp dropped");
