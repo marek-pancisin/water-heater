@@ -58,9 +58,12 @@ bool simulationEnabled = false;  // Default: vypnutý
 unsigned int emergencyTimeOn = 10;  // Default: 10 sekúnd (konfigurovateľné v menu)
 bool emergencyActive = false;   // Aktuálny stav emergency režimu
 unsigned long emergencyStartTime = 0;
-const unsigned long EMERGENCY_BUTTON_HOLD = 5000; // 5 sekúnd držať tlačidlo
+const unsigned long EMERGENCY_BUTTON_HOLD = 3000; // 3 sekundy držať tlačidlo
 unsigned long rightButtonPressStart = 0;
 bool rightButtonHeld = false;
+// Paused state during emergency
+unsigned long elapsedBeforePause = 0;  // How much time elapsed before pause
+bool pausedRelayState = false;          // Relay state when paused
 
 // Premenné pre sledovanie stavu
 bool relayState = false;
@@ -219,21 +222,26 @@ void checkEmergencyButton() {
       rightButtonPressStart = millis();
     }
     
-    // Check if held for 5 seconds
+    // Check if held for 3 seconds
     if (millis() - rightButtonPressStart >= EMERGENCY_BUTTON_HOLD) {
       rightButtonHeld = true;
       emergencyActive = true;
       emergencyStartTime = millis();
       rightButtonPressStart = 0;
       
+      // Save current countdown state before pausing
+      elapsedBeforePause = millis() - previousMillis;
+      pausedRelayState = relayState;
+      
       // Turn on relay for emergency (respect simulation mode)
+      relayState = true;  // Set relay to ON state for emergency
       if (!simulationEnabled) {
         digitalWrite(RELAY_PIN, LOW); // LOW = relay ON
       }
       digitalWrite(LED_PIN, HIGH);
     }
   } else if (currentButton != RIGHT) {
-    // Reset if button released before 5 seconds
+    // Reset if button released before 3 seconds
     rightButtonPressStart = 0;
     rightButtonHeld = false;
   }
@@ -273,6 +281,33 @@ void setup() {
 
 void displayNormalMode() {
   lcd.clear();  
+
+  // Emergency mode display
+  if (emergencyActive) {
+    unsigned long currentMillis = millis();
+    unsigned long emergencyDuration = ((unsigned long)emergencyTimeOn) * 1000UL;
+    unsigned long emergencyElapsed = currentMillis - emergencyStartTime;
+    
+    // Protect against underflow if emergency duration has passed
+    unsigned long emergencyRemaining = 0;
+    if (emergencyElapsed < emergencyDuration) {
+      emergencyRemaining = (emergencyDuration - emergencyElapsed) / 1000;
+    }
+    
+    // First row: "ON :" with emergency countdown
+    lcd.setCursor(0, 0);
+    lcd.print("ON :");
+    lcd.print(emergencyRemaining);
+    lcd.print("s");
+    
+    // Second row: "E:10s" format (E = emergency, configured time)
+    lcd.setCursor(0, 1);
+    lcd.print("E:");
+    lcd.print(emergencyTimeOn);
+    lcd.print("s");
+    
+    return;
+  }
 
   unsigned long currentMillis = millis();
   unsigned long elapsed = currentMillis - previousMillis;
@@ -577,10 +612,17 @@ void controlRelay() {
       rightButtonHeld = false;
       rightButtonPressStart = 0;
       
-      // Reset timing to start fresh interval
-      previousMillis = millis();
+      // When emergency ends, start with OFF countdown in manual mode
+      if (currentMode == MANUAL) {
+        relayState = false;  // Set relay to OFF
+        previousMillis = millis();  // Reset timing to start fresh OFF interval
+      } else {
+        // In automatic mode, restore paused countdown state
+        relayState = pausedRelayState;
+        previousMillis = millis() - elapsedBeforePause;  // Restore paused countdown
+      }
       
-      // Restore relay state based on current operation mode
+      // Update physical relay and LED based on new state
       if (!simulationEnabled) {
         digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
       }
