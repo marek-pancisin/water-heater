@@ -84,6 +84,17 @@ enum Button { NONE, RIGHT, UP, DOWN, LEFT, SELECT };
 
 // ========== DS18B20 funkcie ========== 
 
+// Helper function to count digits in a number
+int countDigits(unsigned long n) {
+  if (n == 0) return 1;
+  int count = 0;
+  while (n > 0) {
+    count++;
+    n /= 10;
+  }
+  return count;
+}
+
 void printAddress(DeviceAddress deviceAddress) {
   for (uint8_t i = 0; i < 8; i++) {
     if (deviceAddress[i] < 16) Serial.print("0");
@@ -296,7 +307,7 @@ void displayNormalMode() {
   lcd.print("s");
   
   // Fill with dashes until column 10
-  int pos = 5 + String(remaining).length(); // Position after "OFF:Xs"
+  int pos = 5 + countDigits(remaining); // Position after "OFF:Xs" or "ON :Xs"
   for (int i = pos; i < 10; i++) {
     lcd.print("-");
   }
@@ -327,7 +338,7 @@ void displayNormalMode() {
   lcd.print("s");
   
   // Fill with dashes until column 10
-  pos = 2 + String(onIntervalSeconds).length() + 1 + String(offIntervalSeconds).length() + 1; // Position after "M:X/Ys"
+  pos = 2 + countDigits(onIntervalSeconds) + 1 + countDigits(offIntervalSeconds) + 1; // Position after "M:X/Ys"
   for (int i = pos; i < 10; i++) {
     lcd.print("-");
   }
