@@ -279,36 +279,55 @@ void displayNormalMode() {
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
   unsigned long remaining = (interval - elapsed) / 1000;
   
+  // First row: OFF/ON status (3 chars), colon, time in seconds, space, I: input temp
+  // Format: "OFF:3s    I:18.3" or "ON :3s    I:18.3"
   lcd.setCursor(0, 0);
-  lcd.print(remaining);
-  lcd.print("s  ");
   
-  lcd.setCursor(4, 0);
-  if (temperature >= -9.9 && temperature <= 99.9) {
-    lcd.print(temperature, 1);
-    lcd.print("C");
+  // Print relay status (OFF or ON with space)
+  if (relayState) {
+    lcd.print("ON ");
   } else {
-    lcd.print("--.-C");
+    lcd.print("OFF");
   }
-
+  lcd.print(":");
+  
+  // Print remaining time
+  lcd.print(remaining);
+  lcd.print("s");
+  
+  // Print input temp at column 10 (empty space between)
+  lcd.setCursor(10, 0);
+  lcd.print("I:");
+  if (ds18b20Available && tempInput >= -55 && tempInput <= 125) {
+    lcd.print(tempInput, 1);
+  } else {
+    lcd.print("--.-");
+  }
+  
+  // Second row: M/A for mode, colon, on/off config, space, O: output temp
+  // Format: "M:1/105s  O:23.5" or "A:1/105s  O:23.5"
   lcd.setCursor(0, 1);
-  lcd.print("S:");
+  
+  // Print mode
+  if (currentMode == MANUAL) {
+    lcd.print("M:");
+  } else {
+    lcd.print("A:");
+  }
+  
+  // Print on/off intervals
   lcd.print(onIntervalSeconds);
   lcd.print("/");
   lcd.print(offIntervalSeconds);
-
-  lcd.setCursor(11, 0);
+  lcd.print("s");
+  
+  // Print output temp at column 10 (empty space between)
+  lcd.setCursor(10, 1);
+  lcd.print("O:");
   if (ds18b20Available && tempOutput >= -55 && tempOutput <= 125) {
-    lcd.print(tempOutput, 2);
+    lcd.print(tempOutput, 1);
   } else {
-    lcd.print("--.--");
-  }
-
-  lcd.setCursor(11, 1);
-  if (ds18b20Available && tempInput >= -55 && tempInput <= 125) {
-    lcd.print(tempInput, 2);
-  } else {
-    lcd.print("--.--");
+    lcd.print("--.-");
   }
 }
 
