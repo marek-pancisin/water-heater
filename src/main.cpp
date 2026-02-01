@@ -62,8 +62,8 @@ const unsigned long EMERGENCY_BUTTON_HOLD = 3000; // 3 sekundy držať tlačidlo
 unsigned long rightButtonPressStart = 0;
 bool rightButtonHeld = false;
 // Paused state during emergency
-unsigned long pausedElapsed = 0;  // How much time elapsed before pause
-bool pausedRelayState = false;     // Relay state when paused
+unsigned long elapsedBeforePause = 0;  // How much time elapsed before pause
+bool pausedRelayState = false;          // Relay state when paused
 
 // Premenné pre sledovanie stavu
 bool relayState = false;
@@ -230,7 +230,7 @@ void checkEmergencyButton() {
       rightButtonPressStart = 0;
       
       // Save current countdown state before pausing
-      pausedElapsed = millis() - previousMillis;
+      elapsedBeforePause = millis() - previousMillis;
       pausedRelayState = relayState;
       
       // Turn on relay for emergency (respect simulation mode)
@@ -287,7 +287,12 @@ void displayNormalMode() {
     unsigned long currentMillis = millis();
     unsigned long emergencyDuration = ((unsigned long)emergencyTimeOn) * 1000UL;
     unsigned long emergencyElapsed = currentMillis - emergencyStartTime;
-    unsigned long emergencyRemaining = (emergencyDuration - emergencyElapsed) / 1000;
+    
+    // Protect against underflow if emergency duration has passed
+    unsigned long emergencyRemaining = 0;
+    if (emergencyElapsed < emergencyDuration) {
+      emergencyRemaining = (emergencyDuration - emergencyElapsed) / 1000;
+    }
     
     // First row: "ON :" with emergency countdown
     lcd.setCursor(0, 0);
@@ -612,9 +617,9 @@ void controlRelay() {
         relayState = false;  // Set relay to OFF
         previousMillis = millis();  // Reset timing to start fresh OFF interval
       } else {
-        // In automatic mode, restore previous state (not yet implemented for automatic)
+        // In automatic mode, restore paused countdown state
         relayState = pausedRelayState;
-        previousMillis = millis() - pausedElapsed;  // Restore paused countdown
+        previousMillis = millis() - elapsedBeforePause;  // Restore paused countdown
       }
       
       // Update physical relay and LED based on new state
