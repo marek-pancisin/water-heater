@@ -151,9 +151,65 @@ The following values are stored in EEPROM:
 ## Relay Control
 
 - **Manual Mode**: Relay is controlled by timer intervals (existing behavior)
-- **Automatic Mode**: Relay control algorithm not yet implemented (reserved for future)
+- **Automatic Mode**: Relay is controlled by intelligent 3-state algorithm based on temperature readings
 - **Simulation Mode**: When enabled, relay switching is disabled but LED indication continues to work
 - **Emergency Mode**: When triggered, relay is forced ON for the configured emergency time on duration, overriding normal operation
+
+### Automatic Mode Algorithm
+
+The automatic mode implements a 3-state state machine that intelligently controls the water heater relay based on input and output temperature readings from DS18B20 sensors.
+
+#### Algorithm States
+
+**1. AUTO_OFF State (State 0)**
+- Initial state when automatic mode starts
+- **Condition**: Input and output temperatures are nearly the same (within 2°C offset)
+- **Behavior**: Relay remains OFF, system monitors temperatures
+- **Transition**: When output temperature exceeds input by more than 2°C, transition to HEATING_STARTED
+
+**2. AUTO_HEATING_STARTED State (State 1)**
+- Water heater is actively heating the water
+- **Goal**: Maintain output temperature higher than input temperature
+- **Temperature Offset**: 3°C (keeps output at least 3°C above input)
+- **Decision Interval**: 60 seconds between decisions
+- **Relay Pulse**: Short 500ms pulse when input temp (+offset) approaches output temp
+- **Logic**: If `tempInput + 3°C >= tempOutput`, activate relay for 500ms to pump cold water
+- **Transition**: When output temperature reaches destination temperature, move to CONTINUING_CYCLE
+
+**3. AUTO_CONTINUING_CYCLE State (State 2)**
+- Destination temperature has been reached, maintaining target temperature
+- **Goal**: Keep water at destination temperature with minimal relay cycling
+- **Temperature Offset**: 1.5°C (smaller difference for finer control)
+- **Decision Interval**: 60 seconds between decisions
+- **Relay Pulse**: Longer 1000ms pulse for better temperature maintenance
+- **Logic**: If `tempInput + 1.5°C >= tempOutput`, activate relay for 1000ms
+- **Fallback**: If output drops more than 5°C below destination, return to HEATING_STARTED
+
+#### Algorithm Constants
+
+- `AUTO_TEMP_OFFSET_OFF`: 2.0°C - Offset to detect heating has started
+- `AUTO_TEMP_OFFSET_HEATING`: 3.0°C - Offset to maintain during heating phase
+- `AUTO_TEMP_OFFSET_CYCLE`: 1.5°C - Offset during temperature maintenance
+- `AUTO_DECISION_INTERVAL`: 60 seconds - Time between algorithm decisions
+- `AUTO_RELAY_PULSE_SHORT`: 500ms - Short pulse duration for heating phase
+- `AUTO_RELAY_PULSE_LONG`: 1000ms - Long pulse duration for maintenance phase
+
+#### Display Format
+
+When in automatic mode, the LCD displays:
+- **Row 1**: Relay status, time info, Input temperature
+  - Example: `OFF:45s   I:45.2`
+- **Row 2**: Mode (A:), Current state number, Destination temperature, Output temperature
+  - Example: `A:1:50C  O:48.7`
+  - State numbers: 0=OFF, 1=HEATING, 2=CYCLE
+
+#### Serial Output
+
+The automatic mode algorithm outputs detailed debugging information via serial:
+- Temperature readings with mode and state info
+- Decision points every 60 seconds with all relevant temperatures
+- State transitions with explanations
+- Relay pulse activation and completion messages
 
 ## Emergency Mode Behavior
 
