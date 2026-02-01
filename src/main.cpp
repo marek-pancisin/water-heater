@@ -84,17 +84,6 @@ enum Button { NONE, RIGHT, UP, DOWN, LEFT, SELECT };
 
 // ========== DS18B20 funkcie ========== 
 
-// Helper function to count digits in a number
-int countDigits(unsigned long n) {
-  if (n == 0) return 1;
-  int count = 0;
-  while (n > 0) {
-    count++;
-    n /= 10;
-  }
-  return count;
-}
-
 void printAddress(DeviceAddress deviceAddress) {
   for (uint8_t i = 0; i < 8; i++) {
     if (deviceAddress[i] < 16) Serial.print("0");
@@ -290,8 +279,8 @@ void displayNormalMode() {
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
   unsigned long remaining = (interval - elapsed) / 1000;
   
-  // First row: OFF/ON status (3 chars), colon, time in seconds, dashes, I: input temp
-  // Format: "OFF:3s----I:18.3" or "ON :3s----I:18.3"
+  // First row: OFF/ON status (3 chars), colon, time in seconds, space, I: input temp
+  // Format: "OFF:3s    I:18.3" or "ON :3s    I:18.3"
   lcd.setCursor(0, 0);
   
   // Print relay status (OFF or ON with space)
@@ -306,14 +295,8 @@ void displayNormalMode() {
   lcd.print(remaining);
   lcd.print("s");
   
-  // Fill with dashes until column 10
-  // Position = 3 (OFF/ON) + 1 (:) + digits(remaining) + 1 (s) = 5 + digits
-  int pos = 5 + countDigits(remaining);
-  for (int i = pos; i < 10; i++) {
-    lcd.print("-");
-  }
-  
-  // Print input temp at column 10
+  // Print input temp at column 10 (empty space between)
+  lcd.setCursor(10, 0);
   lcd.print("I:");
   if (ds18b20Available && tempInput >= -55 && tempInput <= 125) {
     lcd.print(tempInput, 1);
@@ -321,8 +304,8 @@ void displayNormalMode() {
     lcd.print("--.-");
   }
   
-  // Second row: M/A for mode, colon, on/off config, dashes, O: output temp
-  // Format: "M:1/105s--O:23.5" or "A:1/105s--O:23.5"
+  // Second row: M/A for mode, colon, on/off config, space, O: output temp
+  // Format: "M:1/105s  O:23.5" or "A:1/105s  O:23.5"
   lcd.setCursor(0, 1);
   
   // Print mode
@@ -338,14 +321,8 @@ void displayNormalMode() {
   lcd.print(offIntervalSeconds);
   lcd.print("s");
   
-  // Fill with dashes until column 10
-  // Position = 2 (M:) + digits(on) + 1 (/) + digits(off) + 1 (s)
-  pos = 2 + countDigits(onIntervalSeconds) + 1 + countDigits(offIntervalSeconds) + 1;
-  for (int i = pos; i < 10; i++) {
-    lcd.print("-");
-  }
-  
-  // Print output temp at column 10
+  // Print output temp at column 10 (empty space between)
+  lcd.setCursor(10, 1);
   lcd.print("O:");
   if (ds18b20Available && tempOutput >= -55 && tempOutput <= 125) {
     lcd.print(tempOutput, 1);
