@@ -551,7 +551,7 @@ void controlRelay() {
   // Handle emergency mode - override normal operation
   if (emergencyActive) {
     unsigned long currentMillis = millis();
-    unsigned long emergencyDuration = (unsigned long)emergencyTimeOn * 1000;
+    unsigned long emergencyDuration = ((unsigned long)emergencyTimeOn) * 1000UL;
     if (currentMillis - emergencyStartTime >= emergencyDuration) {
       // Emergency period ended, return to normal operation
       emergencyActive = false;
