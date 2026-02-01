@@ -307,7 +307,8 @@ void displayNormalMode() {
   lcd.print("s");
   
   // Fill with dashes until column 10
-  int pos = 5 + countDigits(remaining); // Position after "OFF:Xs" or "ON :Xs"
+  // Position = 3 (OFF/ON) + 1 (:) + digits(remaining) + 1 (s) = 5 + digits
+  int pos = 5 + countDigits(remaining);
   for (int i = pos; i < 10; i++) {
     lcd.print("-");
   }
@@ -338,7 +339,8 @@ void displayNormalMode() {
   lcd.print("s");
   
   // Fill with dashes until column 10
-  pos = 2 + countDigits(onIntervalSeconds) + 1 + countDigits(offIntervalSeconds) + 1; // Position after "M:X/Ys"
+  // Position = 2 (M:) + digits(on) + 1 (/) + digits(off) + 1 (s)
+  pos = 2 + countDigits(onIntervalSeconds) + 1 + countDigits(offIntervalSeconds) + 1;
   for (int i = pos; i < 10; i++) {
     lcd.print("-");
   }
