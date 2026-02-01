@@ -90,9 +90,11 @@ Všetky nastavenia sú na rovnakej úrovni a navigujete medzi nimi pomocou LEFT/
 
 ### Emergency režim:
 V normálnom režime (vždy dostupný):
-- Držte **RIGHT** tlačidlo 5 sekúnd
+- Držte **RIGHT** tlačidlo 3 sekundy
 - Relé sa automaticky zapne na nastavený emergency čas
+- Normálny odpočet ON/OFF intervalov je pozastavený
 - Po uplynutí času sa systém vráti do normálneho režimu
+- V manuálnom režime začína s OFF odpočtom
 
 **Poznámka:** Emergency čas sa nastavuje v setup menu (SELECT → použite RIGHT tlačidlo na navigáciu: REZIM → SIMULACIA → EMERGENCY TIME → UP/DOWN pre zmenu času).
 
@@ -143,7 +145,9 @@ IN: 45.2°C | OUT: 48.7°C | d: 3.5°C
 - ✅ Konfigurovateľný emergency režim v setup menu
 - ✅ EEPROM uloženie emergency nastavenia
 - ✅ Automatické vypnutie relé po 10 sekundách
-- ✅ 5 sekundové držanie tlačidla pre aktiváciu
+- ✅ 3 sekundové držanie tlačidla pre aktiváciu
+- ✅ Pozastavenie normálneho odpočtu počas emergency režimu
+- ✅ Po skončení emergency v manuálnom režime začína OFF odpočet
 
 ### V4.0 + DS18B20
 - ✅ Pridaných 2x DS18B20 teplotných senzorov

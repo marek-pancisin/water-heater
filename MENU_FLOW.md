@@ -18,12 +18,13 @@ This document describes the menu navigation flow for the mode setup feature and 
 ## Emergency Button Feature
 
 ### Overview
-The emergency button feature allows users to manually activate the relay for a configurable duration by holding the RIGHT button for 5 seconds in NORMAL mode.
+The emergency button feature allows users to manually activate the relay for a configurable duration by holding the RIGHT button for 3 seconds in NORMAL mode.
 
 ### Activation
-- **In NORMAL mode**: Hold **RIGHT** button for 5 seconds
+- **In NORMAL mode**: Hold **RIGHT** button for 3 seconds
 - **Effect**: Relay turns ON for the configured emergency time on duration
 - **Always available**: Emergency mode is always active (no longer needs to be enabled)
+- **Pause behavior**: Normal ON/OFF countdown is paused during emergency
 
 ### Configuration
 Emergency time on duration (in seconds) can be configured in the **MENU_EMERGENCY_TIME** setup menu.
@@ -33,7 +34,7 @@ Emergency time on duration (in seconds) can be configured in the **MENU_EMERGENC
 
 ### From Normal Screen
 - **SELECT** button → Opens **MENU_MODE**
-- **RIGHT** button (hold 5s) → Activates emergency mode (always available)
+- **RIGHT** button (hold 3s) → Activates emergency mode (always available)
 
 ### Flat Menu Structure
 
@@ -159,15 +160,20 @@ The following values are stored in EEPROM:
 ### Activation Requirements
 - Emergency mode is always available (no need to enable in menu)
 - Must be in **NORMAL** mode (not in setup menu)
-- Hold **RIGHT** button for 5 seconds continuously
+- Hold **RIGHT** button for 3 seconds continuously
 
 ### During Emergency
 - Relay is forced ON (regardless of current state)
 - LED turns ON
 - Normal relay control is suspended
+- Normal ON/OFF countdown is paused
 - Emergency lasts for the configured emergency time on duration
+- Display shows:
+  - **First row**: Emergency countdown (e.g., "ON :8s")
+  - **Second row**: Emergency indicator with configured time (e.g., "E:10s")
 
 ### After Emergency
 - System returns to normal operation
-- Relay state is restored based on current timer state
+- **Manual Mode**: Relay switches to OFF and starts OFF countdown
+- **Automatic Mode**: Relay state and countdown are restored from pause point
 - Normal relay cycling resumes
