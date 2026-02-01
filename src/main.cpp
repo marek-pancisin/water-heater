@@ -44,9 +44,26 @@ const byte EEPROM_MAGIC = 0xAB;   // Magic hodnota
 enum ControlMode { MANUAL, AUTOMATIC };
 ControlMode currentMode = MANUAL;  // Default: manuálny režim
 
+// Automatic mode states
+enum AutoState { AUTO_OFF, AUTO_HEATING_STARTED, AUTO_CONTINUING_CYCLE };
+AutoState autoState = AUTO_OFF;
+
 // Nastavenie intervalov (v sekundách)
 unsigned long offIntervalSeconds = 5;   // Default: 5 sekúnd vypnuté
 unsigned long onIntervalSeconds = 1;    // Default: 1 sekunda zapnuté
+
+// Automatic mode algorithm constants
+const float AUTO_TEMP_OFFSET_OFF = 2.0;           // Temperature offset for OFF state detection (°C)
+const float AUTO_TEMP_OFFSET_HEATING = 3.0;       // Temperature offset to maintain during heating (°C)
+const float AUTO_TEMP_OFFSET_CYCLE = 1.5;         // Temperature offset during continuing cycle (°C)
+const unsigned long AUTO_DECISION_INTERVAL = 60000; // Decision interval: 60 seconds
+const unsigned long AUTO_RELAY_PULSE_SHORT = 500;   // Short relay pulse: 500ms
+const unsigned long AUTO_RELAY_PULSE_LONG = 1000;   // Long relay pulse: 1000ms
+
+// Automatic mode state tracking
+unsigned long lastAutoDecision = 0;
+unsigned long autoRelayOnTime = 0;  // Time when relay was turned on in auto mode
+bool autoRelayPulsing = false;       // Flag to track if relay is in pulse mode
 
 // Nastavenie cieľovej teploty (pre automatický režim)
 int destinationTemperature = 50;  // Default: 50°C
@@ -139,6 +156,22 @@ void readDS18B20() {
       tempInput = tIn;
       tempOutput = tOut;
       tempDelta = tempOutput - tempInput;
+      
+      // Print temperature readings with mode info
+      Serial.print("IN: ");
+      Serial.print(tempInput, 1);
+      Serial.print("°C | OUT: ");
+      Serial.print(tempOutput, 1);
+      Serial.print("°C | d: ");
+      Serial.print(tempDelta, 1);
+      Serial.print("°C");
+      
+      if (currentMode == AUTOMATIC) {
+        Serial.print(" | Mode: AUTO State: ");
+        Serial.print(autoState);
+      }
+      
+      Serial.println();
     }
   }
 }
@@ -276,6 +309,9 @@ void setup() {
   
   loadFromEEPROM();
   
+  // Initialize automatic mode decision timer
+  lastAutoDecision = millis();
+  
   startTime = millis();
 }
 
@@ -350,11 +386,19 @@ void displayNormalMode() {
     lcd.print("A:");
   }
   
-  // Print on/off intervals
-  lcd.print(onIntervalSeconds);
-  lcd.print("/");
-  lcd.print(offIntervalSeconds);
-  lcd.print("s");
+  // Print on/off intervals for manual mode, or auto state for automatic mode
+  if (currentMode == MANUAL) {
+    lcd.print(onIntervalSeconds);
+    lcd.print("/");
+    lcd.print(offIntervalSeconds);
+    lcd.print("s");
+  } else {
+    // Show auto state: 0=OFF, 1=HEAT, 2=CYCLE
+    lcd.print(autoState);
+    lcd.print(":");
+    lcd.print(destinationTemperature);
+    lcd.print("C");
+  }
   
   // Print output temp at column 10 (empty space between)
   lcd.setCursor(10, 1);
@@ -451,7 +495,22 @@ void handleButtons() {
       
     case MENU_MODE:
       if (btn == UP || btn == DOWN) {
+        ControlMode previousMode = currentMode;
         currentMode = (currentMode == MANUAL) ? AUTOMATIC : MANUAL;
+        
+        // Reset automatic mode state when switching to automatic mode
+        if (currentMode == AUTOMATIC && previousMode == MANUAL) {
+          autoState = AUTO_OFF;
+          lastAutoDecision = millis();
+          autoRelayPulsing = false;
+          relayState = false;  // Start with relay off
+          if (!simulationEnabled) {
+            digitalWrite(RELAY_PIN, HIGH); // HIGH = relay OFF
+          }
+          digitalWrite(LED_PIN, LOW);
+          Serial.println("Switched to AUTOMATIC mode - Reset to AUTO_OFF state");
+        }
+        
         displayMenuMode();
       } else if (btn == RIGHT) {
         // Navigate to simulation menu
@@ -601,6 +660,109 @@ void handleButtons() {
   }
 }
 
+void controlRelayAutomatic() {
+  // Skip automatic control if sensors are not available
+  if (!ds18b20Available) return;
+  
+  unsigned long currentMillis = millis();
+  
+  // Handle relay pulse timing (turn off after pulse duration)
+  if (autoRelayPulsing && relayState) {
+    unsigned long pulseDuration = (autoState == AUTO_HEATING_STARTED) ? AUTO_RELAY_PULSE_SHORT : AUTO_RELAY_PULSE_LONG;
+    if (currentMillis - autoRelayOnTime >= pulseDuration) {
+      // Turn off relay after pulse
+      relayState = false;
+      autoRelayPulsing = false;
+      if (!simulationEnabled) {
+        digitalWrite(RELAY_PIN, HIGH); // HIGH = relay OFF
+      }
+      digitalWrite(LED_PIN, LOW);
+      Serial.println("AUTO: Relay pulse ended");
+    }
+    return; // Don't make decisions while pulsing
+  }
+  
+  // Make decisions every 60 seconds
+  if (currentMillis - lastAutoDecision < AUTO_DECISION_INTERVAL) {
+    return;
+  }
+  
+  lastAutoDecision = currentMillis;
+  
+  // State machine logic
+  float tempDiff = tempOutput - tempInput;
+  
+  Serial.print("AUTO Decision - State: ");
+  Serial.print(autoState);
+  Serial.print(" | IN: ");
+  Serial.print(tempInput, 1);
+  Serial.print("°C | OUT: ");
+  Serial.print(tempOutput, 1);
+  Serial.print("°C | Delta: ");
+  Serial.print(tempDiff, 1);
+  Serial.print("°C | Target: ");
+  Serial.print(destinationTemperature);
+  Serial.println("°C");
+  
+  switch (autoState) {
+    case AUTO_OFF:
+      // State 1: OFF state - input and output temperatures are nearly same
+      // If output temperature starts growing, transition to HEATING_STARTED
+      if (tempDiff > AUTO_TEMP_OFFSET_OFF) {
+        autoState = AUTO_HEATING_STARTED;
+        Serial.println("AUTO: Transition to HEATING_STARTED");
+      }
+      break;
+      
+    case AUTO_HEATING_STARTED:
+      // State 2: Heating started - maintain output > input
+      // Check if we reached destination temperature
+      if (tempOutput >= destinationTemperature) {
+        autoState = AUTO_CONTINUING_CYCLE;
+        Serial.println("AUTO: Transition to CONTINUING_CYCLE - reached destination");
+        break;
+      }
+      
+      // If input temperature (with offset) is higher than output, enable relay briefly
+      if (tempInput + AUTO_TEMP_OFFSET_HEATING >= tempOutput) {
+        // Turn on relay for short pulse (500ms) to pump cold water
+        relayState = true;
+        autoRelayPulsing = true;
+        autoRelayOnTime = currentMillis;
+        if (!simulationEnabled) {
+          digitalWrite(RELAY_PIN, LOW); // LOW = relay ON
+        }
+        digitalWrite(LED_PIN, HIGH);
+        Serial.println("AUTO: HEATING_STARTED - Short pulse to cool input");
+      }
+      break;
+      
+    case AUTO_CONTINUING_CYCLE:
+      // State 3: Continuing cycle - maintain temperature at destination
+      // Check if output temperature drops significantly below destination
+      if (tempOutput < destinationTemperature - 5.0) {
+        // Return to heating state if temperature drops too much
+        autoState = AUTO_HEATING_STARTED;
+        Serial.println("AUTO: Return to HEATING_STARTED - temp dropped");
+        break;
+      }
+      
+      // Maintain smaller temperature difference between input and output
+      if (tempInput + AUTO_TEMP_OFFSET_CYCLE >= tempOutput) {
+        // Turn on relay for longer time in this state
+        relayState = true;
+        autoRelayPulsing = true;
+        autoRelayOnTime = currentMillis;
+        if (!simulationEnabled) {
+          digitalWrite(RELAY_PIN, LOW); // LOW = relay ON
+        }
+        digitalWrite(LED_PIN, HIGH);
+        Serial.println("AUTO: CONTINUING_CYCLE - Pulse to maintain temp");
+      }
+      break;
+  }
+}
+
 void controlRelay() {
   // Handle emergency mode - override normal operation
   if (emergencyActive) {
@@ -631,6 +793,13 @@ void controlRelay() {
     return; // Skip normal relay control during emergency
   }
   
+  // Use automatic mode algorithm if in AUTOMATIC mode
+  if (currentMode == AUTOMATIC) {
+    controlRelayAutomatic();
+    return;
+  }
+  
+  // Manual mode: existing timer-based control
   unsigned long currentMillis = millis();
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
   
