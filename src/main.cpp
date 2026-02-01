@@ -37,7 +37,7 @@ const int EEPROM_ADDR_MAGIC = 4;  // Magic byte pre kontrolu inicializácie
 const int EEPROM_ADDR_MODE = 5;   // Adresa pre režim (1 bajt)
 const int EEPROM_ADDR_DEST_TEMP = 6; // Adresa pre cieľovú teplotu (2 bajty)
 const int EEPROM_ADDR_SIMULATION = 8; // Adresa pre simulačný režim (1 bajt)
-const int EEPROM_ADDR_EMERGENCY = 9; // Adresa pre emergency mode (1 bajt)
+const int EEPROM_ADDR_EMERGENCY_TIME = 9; // Adresa pre emergency time on (2 bajty)
 const byte EEPROM_MAGIC = 0xAB;   // Magic hodnota
 
 // Režimy ovládania
@@ -55,10 +55,9 @@ int destinationTemperature = 50;  // Default: 50°C
 bool simulationEnabled = false;  // Default: vypnutý
 
 // Emergency režim
-bool emergencyEnabled = false;  // Default: vypnutý (konfigurovateľné v menu)
+unsigned int emergencyTimeOn = 10;  // Default: 10 sekúnd (konfigurovateľné v menu)
 bool emergencyActive = false;   // Aktuálny stav emergency režimu
 unsigned long emergencyStartTime = 0;
-const unsigned long EMERGENCY_DURATION = 10000;  // 10 sekúnd
 const unsigned long EMERGENCY_BUTTON_HOLD = 5000; // 5 sekúnd držať tlačidlo
 unsigned long rightButtonPressStart = 0;
 bool rightButtonHeld = false;
@@ -75,7 +74,7 @@ unsigned long lastDHTRead = 0;
 const unsigned long DHT_READ_INTERVAL = 2000; // Čítaj každé 2 sekundy
 
 // Menu premenné
-enum MenuState { NORMAL, MENU_MODE, MENU_OFF, MENU_ON, MENU_DEST_TEMP, MENU_SIMULATION, MENU_EMERGENCY, DETAIL_TEMP }; 
+enum MenuState { NORMAL, MENU_MODE, MENU_OFF, MENU_ON, MENU_DEST_TEMP, MENU_SIMULATION, MENU_EMERGENCY_TIME, DETAIL_TEMP }; 
 MenuState menuState = NORMAL;
 unsigned long lastButtonPress = 0;
 const unsigned long debounceDelay = 200;
@@ -152,7 +151,8 @@ void saveToEEPROM() {
   EEPROM.write(EEPROM_ADDR_DEST_TEMP, destinationTemperature & 0xFF);
   EEPROM.write(EEPROM_ADDR_DEST_TEMP + 1, (destinationTemperature >> 8) & 0xFF);
   EEPROM.write(EEPROM_ADDR_SIMULATION, simulationEnabled ? 1 : 0);
-  EEPROM.write(EEPROM_ADDR_EMERGENCY, emergencyEnabled ? 1 : 0);
+  EEPROM.write(EEPROM_ADDR_EMERGENCY_TIME, emergencyTimeOn & 0xFF);
+  EEPROM.write(EEPROM_ADDR_EMERGENCY_TIME + 1, (emergencyTimeOn >> 8) & 0xFF);
   EEPROM.write(EEPROM_ADDR_MAGIC, EEPROM_MAGIC);
 }
 
@@ -182,12 +182,14 @@ void loadFromEEPROM() {
   byte simulationValue = EEPROM.read(EEPROM_ADDR_SIMULATION);
   simulationEnabled = (simulationValue == 1);
   
-  byte emergencyValue = EEPROM.read(EEPROM_ADDR_EMERGENCY);
-  emergencyEnabled = (emergencyValue == 1);
+  lowByte = EEPROM.read(EEPROM_ADDR_EMERGENCY_TIME);
+  highByte = EEPROM.read(EEPROM_ADDR_EMERGENCY_TIME + 1);
+  emergencyTimeOn = (highByte << 8) | lowByte;
   
   if (offIntervalSeconds < 1 || offIntervalSeconds > 999) offIntervalSeconds = 5;
   if (onIntervalSeconds < 1 || onIntervalSeconds > 999) onIntervalSeconds = 1;
   if (destinationTemperature < 1 || destinationTemperature > 99) destinationTemperature = 50;
+  if (emergencyTimeOn < 1 || emergencyTimeOn > 999) emergencyTimeOn = 10;
 }
 
 Button readButton() {
@@ -202,8 +204,8 @@ Button readButton() {
 }
 
 void checkEmergencyButton() {
-  // Only check for emergency button in NORMAL mode and when emergency is enabled
-  if (menuState != NORMAL || !emergencyEnabled) {
+  // Only check for emergency button in NORMAL mode
+  if (menuState != NORMAL) {
     rightButtonHeld = false;
     rightButtonPressStart = 0;
     return;
@@ -363,14 +365,11 @@ void displayMenuSimulation() {
 
 void displayMenuEmergency() {
   lcd.clear();
-  lcd.print("EMERGENCY:");
+  lcd.print("EMERGENCY TIME:");
   lcd.setCursor(0, 1);
   lcd.print(">> ");
-  if (emergencyEnabled) {
-    lcd.print("ZAPNUTY");
-  } else {
-    lcd.print("VYPNUTY");
-  }
+  lcd.print(emergencyTimeOn);
+  lcd.print(" sekund");
 }
 
 void displaySaving() {
@@ -400,73 +399,19 @@ void handleButtons() {
       if (btn == UP || btn == DOWN) {
         currentMode = (currentMode == MANUAL) ? AUTOMATIC : MANUAL;
         displayMenuMode();
-      } else if (btn == RIGHT || btn == LEFT) {
+      } else if (btn == RIGHT) {
         // Navigate to simulation menu
         menuState = MENU_SIMULATION;
         displayMenuSimulation();
-      } else if (btn == SELECT) {
-        displaySaving();
-        saveToEEPROM();
-        menuState = NORMAL;
-        displayNormalMode();
-      }
-      break;
-      
-    case MENU_OFF:
-      if (btn == UP) {
-        offIntervalSeconds++;
-        if (offIntervalSeconds > 999) offIntervalSeconds = 999;
-        displayMenuOff();
-      } else if (btn == DOWN) {
-        if (offIntervalSeconds > 1) offIntervalSeconds--;
-        displayMenuOff();
-      } else if (btn == RIGHT) {
-        menuState = MENU_ON;
-        displayMenuOn();
       } else if (btn == LEFT) {
-        menuState = MENU_EMERGENCY;
-        displayMenuEmergency();
-      } else if (btn == SELECT) {
-        displaySaving();
-        saveToEEPROM();
-        menuState = NORMAL;
-        displayNormalMode();
-      }
-      break;
-      
-    case MENU_ON:
-      if (btn == UP) {
-        onIntervalSeconds++;
-        if (onIntervalSeconds > 999) onIntervalSeconds = 999;
-        displayMenuOn();
-      } else if (btn == DOWN) {
-        if (onIntervalSeconds > 1) onIntervalSeconds--;
-        displayMenuOn();
-      } else if (btn == LEFT) {
-        menuState = MENU_OFF;
-        displayMenuOff();
-      } else if (btn == RIGHT) {
-        menuState = MENU_EMERGENCY;
-        displayMenuEmergency();
-      } else if (btn == SELECT) {
-        displaySaving();
-        saveToEEPROM();
-        menuState = NORMAL;
-        displayNormalMode();
-      }
-      break;
-      
-    case MENU_DEST_TEMP:
-      if (btn == UP) {
-        destinationTemperature++;
-        if (destinationTemperature > 99) destinationTemperature = 99;
-        displayMenuDestTemp();
-      } else if (btn == DOWN) {
-        if (destinationTemperature > 1) destinationTemperature--;
-        displayMenuDestTemp();
-      } else if (btn == RIGHT || btn == LEFT) {
-        menuState = MENU_EMERGENCY;
-        displayMenuEmergency();
+        // Navigate backward: in manual mode go to MENU_ON, in automatic mode go to MENU_DEST_TEMP
+        if (currentMode == MANUAL) {
+          menuState = MENU_ON;
+          displayMenuOn();
+        } else {
+          menuState = MENU_DEST_TEMP;
+          displayMenuDestTemp();
+        }
       } else if (btn == SELECT) {
         displaySaving();
         saveToEEPROM();
@@ -490,7 +435,7 @@ void handleButtons() {
           digitalWrite(RELAY_PIN, relayState ? LOW : HIGH);
         }
       } else if (btn == RIGHT) {
-        menuState = MENU_EMERGENCY;
+        menuState = MENU_EMERGENCY_TIME;
         displayMenuEmergency();
       } else if (btn == LEFT) {
         menuState = MENU_MODE;
@@ -503,9 +448,13 @@ void handleButtons() {
       }
       break;
       
-    case MENU_EMERGENCY:
-      if (btn == UP || btn == DOWN) {
-        emergencyEnabled = !emergencyEnabled;
+    case MENU_EMERGENCY_TIME:
+      if (btn == UP) {
+        emergencyTimeOn++;
+        if (emergencyTimeOn > 999) emergencyTimeOn = 999;
+        displayMenuEmergency();
+      } else if (btn == DOWN) {
+        if (emergencyTimeOn > 1) emergencyTimeOn--;
         displayMenuEmergency();
       } else if (btn == RIGHT) {
         // Navigate to mode-specific submenu
@@ -513,12 +462,81 @@ void handleButtons() {
           menuState = MENU_OFF;
           displayMenuOff();
         } else {
+          // In automatic mode, skip off/on time and go to dest temp
           menuState = MENU_DEST_TEMP;
           displayMenuDestTemp();
         }
       } else if (btn == LEFT) {
         menuState = MENU_SIMULATION;
         displayMenuSimulation();
+      } else if (btn == SELECT) {
+        displaySaving();
+        saveToEEPROM();
+        menuState = NORMAL;
+        displayNormalMode();
+      }
+      break;
+      
+    case MENU_OFF:
+      if (btn == UP) {
+        offIntervalSeconds++;
+        if (offIntervalSeconds > 999) offIntervalSeconds = 999;
+        displayMenuOff();
+      } else if (btn == DOWN) {
+        if (offIntervalSeconds > 1) offIntervalSeconds--;
+        displayMenuOff();
+      } else if (btn == RIGHT) {
+        menuState = MENU_ON;
+        displayMenuOn();
+      } else if (btn == LEFT) {
+        menuState = MENU_EMERGENCY_TIME;
+        displayMenuEmergency();
+      } else if (btn == SELECT) {
+        displaySaving();
+        saveToEEPROM();
+        menuState = NORMAL;
+        displayNormalMode();
+      }
+      break;
+      
+    case MENU_ON:
+      if (btn == UP) {
+        onIntervalSeconds++;
+        if (onIntervalSeconds > 999) onIntervalSeconds = 999;
+        displayMenuOn();
+      } else if (btn == DOWN) {
+        if (onIntervalSeconds > 1) onIntervalSeconds--;
+        displayMenuOn();
+      } else if (btn == RIGHT) {
+        // Navigate back to mode
+        menuState = MENU_MODE;
+        displayMenuMode();
+      } else if (btn == LEFT) {
+        menuState = MENU_OFF;
+        displayMenuOff();
+      } else if (btn == SELECT) {
+        displaySaving();
+        saveToEEPROM();
+        menuState = NORMAL;
+        displayNormalMode();
+      }
+      break;
+      
+    case MENU_DEST_TEMP:
+      if (btn == UP) {
+        destinationTemperature++;
+        if (destinationTemperature > 99) destinationTemperature = 99;
+        displayMenuDestTemp();
+      } else if (btn == DOWN) {
+        if (destinationTemperature > 1) destinationTemperature--;
+        displayMenuDestTemp();
+      } else if (btn == RIGHT) {
+        // Navigate back to mode
+        menuState = MENU_MODE;
+        displayMenuMode();
+      } else if (btn == LEFT) {
+        menuState = MENU_EMERGENCY_TIME;
+        displayMenuEmergency();
       } else if (btn == SELECT) {
         displaySaving();
         saveToEEPROM();
@@ -533,7 +551,8 @@ void controlRelay() {
   // Handle emergency mode - override normal operation
   if (emergencyActive) {
     unsigned long currentMillis = millis();
-    if (currentMillis - emergencyStartTime >= EMERGENCY_DURATION) {
+    unsigned long emergencyDuration = ((unsigned long)emergencyTimeOn) * 1000UL;
+    if (currentMillis - emergencyStartTime >= emergencyDuration) {
       // Emergency period ended, return to normal operation
       emergencyActive = false;
       rightButtonHeld = false;
