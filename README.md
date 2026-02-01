@@ -49,7 +49,8 @@ DS18B20 senzory pripojte na 1-Wire zbernicu:
 
 ## Funkcie
 
-- **Automatické ovládanie relé** - zapínanie/vypínanie podľa nastavených intervalov
+- **Automatické ovládanie relé** - zapínanie/vypínanie podľa nastavených intervalov v manuálnom režime
+- **Inteligentný automatický režim** - 3-stavový algoritmus riadenia teploty s pulznými intervalmi
 - **Emergency režim** - manuálne zapnutie relé na konfigurovateľný čas držaním RIGHT tlačidla na 5 sekúnd (vždy dostupný)
 - **Meranie teploty a vlhkosti** - údaje z DHT11 senzora zobrazované na LCD
 - **Meranie vstupnej a výstupnej teploty** - presné meranie pomocou DS18B20 senzorov
@@ -62,16 +63,25 @@ DS18B20 senzory pripojte na 1-Wire zbernicu:
 ## Zobrazenie na LCD
 
 ### Hlavná obrazovka (Normálny režim):
+
+**Manuálny režim:**
 ```
-█ 3s  D:23.5°
-I:45.2 O:48.7
+OFF:3s    I:18.3
+M:1/5s    O:23.5
+```
+
+**Automatický režim:**
+```
+OFF:45s   I:45.2
+A:1:50C   O:48.7
 ```
 - **Riadok 1**: 
-  - Ikona relé (■ = ZAP, □ = VYP)
-  - Zostávajúci čas do prepnutia
-  - DHT11 teplota s ikonou stupňa
-- **Riadok 2**: 
+  - OFF/ON stav relé
+  - Zostávajúci čas do ďalšej akcie
   - I = Input (vstupná teplota DS18B20)
+- **Riadok 2**: 
+  - M = Manual (manuálny režim) - zobrazuje ON/OFF intervaly
+  - A = Automatic (automatický režim) - zobrazuje stav algoritmu (0/1/2) a cieľovú teplotu
   - O = Output (výstupná teplota DS18B20)
 
 ### Detail teplôt (tlačidlo UP):
@@ -139,6 +149,25 @@ IN: 45.2°C | OUT: 48.7°C | d: 3.5°C
 ```
 
 ## História verzií
+
+### V5.1 + Dynamic Relay Timing
+- ✅ Dynamické výpočty času zapnutia relé na základe rozdielu teplôt
+- ✅ Lineárna interpolácia: 0ms (rozdiel ≥5°C) až 3000ms (rozdiel ≤-2°C)
+- ✅ Grafy a koeficienty pre mapovanie teploty na čas relé
+- ✅ Automatické prispôsobenie času zapnutia podľa situácie
+- ✅ Odstránené fixné časové intervaly 500ms/1000ms
+- ✅ Jeden univerzálny algoritmus pre oba stavy (HEATING, CYCLE)
+
+### V5.0 + Automatic Mode Algorithm
+- ✅ Implementácia 3-stavového algoritmu pre automatický režim
+- ✅ AUTO_OFF stav - monitorovanie začiatku ohrevu
+- ✅ AUTO_HEATING_STARTED stav - udržiavanie výstupnej teploty vyššej ako vstupnej
+- ✅ AUTO_CONTINUING_CYCLE stav - udržiavanie cieľovej teploty
+- ✅ Pulzné riadenie relé (500ms/1000ms pulzy)
+- ✅ Rozhodovací interval 60 sekúnd
+- ✅ Konfigurovateľné teplotné offsety
+- ✅ Podrobný serial output pre ladenie
+- ✅ Aktualizované LCD zobrazenie pre automatický režim
 
 ### V4.1 + Emergency Button
 - ✅ Emergency režim - manuálne zapnutie relé držaním RIGHT tlačidla

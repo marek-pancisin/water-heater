@@ -151,9 +151,99 @@ The following values are stored in EEPROM:
 ## Relay Control
 
 - **Manual Mode**: Relay is controlled by timer intervals (existing behavior)
-- **Automatic Mode**: Relay control algorithm not yet implemented (reserved for future)
+- **Automatic Mode**: Relay is controlled by intelligent 3-state algorithm based on temperature readings
 - **Simulation Mode**: When enabled, relay switching is disabled but LED indication continues to work
 - **Emergency Mode**: When triggered, relay is forced ON for the configured emergency time on duration, overriding normal operation
+
+### Automatic Mode Algorithm
+
+The automatic mode implements a 3-state state machine that intelligently controls the water heater relay based on input and output temperature readings from DS18B20 sensors. The relay ON time is **dynamically calculated** based on the temperature difference between output and input.
+
+#### Dynamic Relay Timing
+
+The algorithm uses a **linear interpolation** to calculate relay ON time based on temperature difference:
+
+**Temperature Difference Chart:**
+```
+Temp Diff (°C)  |  Relay ON Time  |  Meaning
+----------------|-----------------|----------------------------------
+  ≥ 5.0         |    0 ms         |  Output much hotter - no cooling needed
+   4.0          |  428 ms         |  Light cooling
+   3.0          |  857 ms         |  Light cooling
+   2.0          | 1285 ms         |  Moderate cooling
+   1.0          | 1714 ms         |  Moderate cooling
+   0.0          | 2142 ms         |  Significant cooling - Output = Input
+  -1.0          | 2571 ms         |  Significant cooling
+  ≤-2.0         | 3000 ms         |  Input hotter - maximum cooling needed
+```
+
+**Formula:**
+- When `tempDiff ≥ 5°C`: relay time = 0ms (no activation)
+- When `tempDiff ≤ -2°C`: relay time = 3000ms (maximum)
+- When `-2°C < tempDiff < 5°C`: Linear interpolation
+  - `relayTime = ((5.0 - tempDiff) / 7.0) * 3000ms`
+
+This ensures:
+- Large temperature differences → Short/no relay activation
+- Small temperature differences → Longer relay activation
+- Input hotter than output → Maximum relay time (3 seconds)
+
+#### Algorithm States
+
+**1. AUTO_OFF State (State 0)**
+- Initial state when automatic mode starts
+- **Condition**: Input and output temperatures are nearly the same (within 2°C offset)
+- **Behavior**: Relay remains OFF, system monitors temperatures
+- **Transition**: When output temperature exceeds input by more than 2°C, transition to HEATING_STARTED
+
+**2. AUTO_HEATING_STARTED State (State 1)**
+- Water heater is actively heating the water
+- **Goal**: Maintain output temperature higher than input temperature
+- **Decision Interval**: 60 seconds between decisions
+- **Relay Control**: Dynamic timing based on temperature difference
+  - Temperature difference calculated every 60 seconds
+  - Relay ON time ranges from 0ms (large diff) to 3000ms (small/negative diff)
+  - Uses linear interpolation between these extremes
+- **Transition**: When output temperature reaches destination temperature, move to CONTINUING_CYCLE
+
+**3. AUTO_CONTINUING_CYCLE State (State 2)**
+- Destination temperature has been reached, maintaining target temperature
+- **Goal**: Keep water at destination temperature with minimal relay cycling
+- **Decision Interval**: 60 seconds between decisions
+- **Relay Control**: Dynamic timing based on temperature difference (same formula as HEATING_STARTED)
+  - Relay ON time calculated based on temp difference
+  - Ranges from 0ms to 3000ms using linear interpolation
+- **Fallback**: If output drops more than 5°C below destination, return to HEATING_STARTED
+
+#### Algorithm Constants
+
+- `AUTO_TEMP_OFFSET_OFF`: 2.0°C - Offset to detect heating has started
+- `AUTO_TEMP_DROP_THRESHOLD`: 5.0°C - Temperature drop to trigger return to heating
+- `AUTO_DECISION_INTERVAL`: 60 seconds - Time between algorithm decisions
+
+**Dynamic Relay Timing Constants:**
+- `AUTO_RELAY_MIN_TIME`: 0ms - Minimum relay ON time (when diff ≥ 5°C)
+- `AUTO_RELAY_MAX_TIME`: 3000ms - Maximum relay ON time (when diff ≤ -2°C)
+- `AUTO_TEMP_DIFF_MIN`: -2.0°C - Temperature difference for max relay time
+- `AUTO_TEMP_DIFF_MAX`: 5.0°C - Temperature difference for min relay time
+
+#### Display Format
+
+When in automatic mode, the LCD displays:
+- **Row 1**: Relay status, time info, Input temperature
+  - Example: `OFF:45s   I:45.2`
+- **Row 2**: Mode (A:), Current state number, Destination temperature, Output temperature
+  - Example: `A:1:50C   O:48.7`
+  - State numbers: 0=OFF, 1=HEATING, 2=CYCLE
+
+#### Serial Output
+
+The automatic mode algorithm outputs detailed debugging information via serial:
+- Temperature readings with mode and state info
+- Decision points every 60 seconds with all relevant temperatures
+- **Calculated relay ON time** for each decision based on temperature difference
+- State transitions with explanations
+- Relay pulse activation and completion messages with actual duration used
 
 ## Emergency Mode Behavior
 
