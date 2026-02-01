@@ -342,11 +342,11 @@ void displayMenuMode() {
 
 void displayMenuDestTemp() {
   lcd.clear();
-  lcd.print("CILOVA TEPLOTA:");
+  lcd.print("CIELOVA TEPLOTA:");
   lcd.setCursor(0, 1);
   lcd.print(">> ");
   lcd.print(destinationTemperature);
-  lcd.print(" °C");
+  lcd.print(" C");
 }
 
 void displayMenuSimulation() {
@@ -551,8 +551,6 @@ void controlRelay() {
     return; // Skip normal relay control during emergency
   }
   
-  if (menuState != NORMAL) return;
-  
   unsigned long currentMillis = millis();
   unsigned long interval = relayState ? (onIntervalSeconds * 1000) : (offIntervalSeconds * 1000);
   
@@ -588,11 +586,13 @@ void readDHTSensor() {
 }
 
 void loop() {
-  readDHTSensor();
-  readDS18B20();
   checkEmergencyButton();
   handleButtons();
   controlRelay();
+  if (menuState == NORMAL) {
+    readDHTSensor();
+    readDS18B20();
+  }
   
   static unsigned long lastDisplayUpdate = 0;
   if (menuState == NORMAL && millis() - lastDisplayUpdate >= 500) {
