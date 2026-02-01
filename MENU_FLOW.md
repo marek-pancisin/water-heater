@@ -168,13 +168,13 @@ The algorithm uses a **linear interpolation** to calculate relay ON time based o
 Temp Diff (°C)  |  Relay ON Time  |  Meaning
 ----------------|-----------------|----------------------------------
   ≥ 5.0         |    0 ms         |  Output much hotter - no cooling needed
-   4.0          |  ~430 ms        |  
-   3.0          |  ~860 ms        |  
-   2.0          |  ~1290 ms       |  
-   1.0          |  ~1710 ms       |  
-   0.0          |  ~2140 ms       |  Output = Input - significant cooling
-  -1.0          |  ~2570 ms       |  
-  ≤-2.0         |  3000 ms        |  Input hotter - maximum cooling needed
+   4.0          |  428 ms         |  Light cooling
+   3.0          |  857 ms         |  Light cooling
+   2.0          | 1285 ms         |  Moderate cooling
+   1.0          | 1714 ms         |  Moderate cooling
+   0.0          | 2142 ms         |  Significant cooling - Output = Input
+  -1.0          | 2571 ms         |  Significant cooling
+  ≤-2.0         | 3000 ms         |  Input hotter - maximum cooling needed
 ```
 
 **Formula:**

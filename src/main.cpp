@@ -677,10 +677,10 @@ unsigned long calculateRelayOnTime(float tempDiff) {
   // If tempDiff is small or negative (input hotter), relay time is long (up to 3s)
   
   // Clamp tempDiff to the defined range
-  if (tempDiff >= AUTO_TEMP_DIFF_MAX) {
+  if (tempDiff > AUTO_TEMP_DIFF_MAX) {
     return AUTO_RELAY_MIN_TIME;  // No relay activation needed
   }
-  if (tempDiff <= AUTO_TEMP_DIFF_MIN) {
+  if (tempDiff < AUTO_TEMP_DIFF_MIN) {
     return AUTO_RELAY_MAX_TIME;  // Maximum relay time
   }
   
